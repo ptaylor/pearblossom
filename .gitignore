@@ -1,32 +1,67 @@
-# If you prefer the allow list template instead of the deny list, see community template:
-# https://github.com/github/gitignore/blob/main/community/Golang/Go.AllowList.gitignore
-#
-# Binaries for programs and plugins
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
+# Swift / Xcode / SPM
 
-# Test binary, built with `go test -c`
-*.test
+# Build artifacts
+.build/
+*.xcodeproj
+*.xcworkspace
+*.xcuserdata
+*.xcscmblueprint
+DerivedData/
 
-# Code coverage profiles and other test artifacts
-*.out
+# Package resolution
+Package.resolved
+
+# macOS
+.DS_Store
+*.dSYM.zip
+*.dSYM
+
+# App bundles
+*.app
+
+# Core Data / SwiftData
+*.xcdatamodeld
+
+# Playgrounds
+*.playground
+playground.xcworkspace
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Code Injection
+iOSInjectionProject/
+
+# Archives
+*.xcarchive
+
+# Simulators
+*.simruntime
+
+# Spotlight
+.metadata_never_index
+
+# Icon
+Icon
+
+# Crash logs
+*.crash
+*.ips
+
+# Code coverage
+*.coverage
 coverage.*
-*.coverprofile
-profile.cov
+*.gcda
+*.gcno
 
-# Dependency directories (remove the comment below to include it)
-# vendor/
-
-# Go workspace file
-go.work
-go.work.sum
-
-# env file
+# Environment
 .env
 
-# Editor/IDE
-# .idea/
-# .vscode/
+# Editor / IDE
+.idea/
+.vscode/
+*.swp
+*.bak
