@@ -1,4 +1,4 @@
-# Photo Collage Creator (Hockney Joiners) — Architecture & Implementation Reference
+# Pearblossom — Architecture & Implementation Reference
 
 **Purpose**: This document is a reference architecture and set of implementation directives for an LLM coding assistant. It captures all design decisions for consistent implementation across sessions. The user will specify what to build in each stage; this plan provides the principles and constraints.
 

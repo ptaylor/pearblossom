@@ -4,7 +4,7 @@ This file provides instructions and conventions for LLM coding assistants workin
 
 ## Project
 
-A macOS desktop app for creating photo collages in the style of David Hockney's "Joiners" — overlapping, misaligned photographs that form a composite image.
+A macOS desktop app for creating photo collages in the style of David Hockney's "Joiners" — overlapping, misaligned photographs that form a composite image. Working title: **Pearblossom**.
 
 ## Architecture Reference
 

@@ -1,6 +1,6 @@
-# Collage
+# Pearblossom
 
-A native macOS desktop app for creating photo collages inspired by David Hockney's "Joiners" — composite images made from overlapping, freeform-arranged photographs.
+A native macOS desktop app for creating photo collages inspired by David Hockney's "Joiners" — composite images made from overlapping, freeform-arranged photographs. Named after Hockney's iconic photomontage *Pearblossom Highway*.
 
 ## Tech Stack
 
