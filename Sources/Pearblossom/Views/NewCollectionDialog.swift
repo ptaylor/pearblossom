@@ -61,11 +61,20 @@ struct NewCollectionDialog: View {
                     createCollection()
                 }
                 .keyboardShortcut(.return)
-                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || nameIsTaken)
             }
         }
         .padding()
         .frame(width: 350)
+    }
+
+    // MARK: - Validation
+
+    /// Whether the current name maps to an existing directory.
+    private var nameIsTaken: Bool {
+        let trimmed = name.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return false }
+        return FileManager.default.fileExists(atPath: settings.collectionFolderURL(named: trimmed).path)
     }
 
     // MARK: - Creation

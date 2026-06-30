@@ -13,6 +13,8 @@ struct CollectionsListView: View {
     @State private var pendingImportURLs: [URL]? = nil
     @State private var showCollectionPickerPopover = false
     @State private var pendingImportTargetID: UUID? = nil
+    @State private var showRenameSheet = false
+    @State private var collectionToRename: PhotoCollection? = nil
 
     /// Image file types the app can import.
     private static let allowedImageTypes: [UTType] = [
@@ -68,6 +70,15 @@ struct CollectionsListView: View {
                 showImportPicker = true
             }
         }
+        .sheet(item: $collectionToRename) { collection in
+            RenameCollectionDialog(collection: collection) { newName in
+                if let index = collections.firstIndex(where: { $0.id == collection.id }) {
+                    collections[index].name = newName
+                    collections[index].folderPath = settings.collectionFolderURL(named: newName).path
+                    collections[index].modifiedAt = Date()
+                }
+            }
+        }
         .fileImporter(
             isPresented: $showImportPicker,
             allowedContentTypes: Self.allowedImageTypes,
@@ -118,6 +129,12 @@ struct CollectionsListView: View {
                 }
                 .padding(.vertical, 2)
                 .tag(collection.id)
+                .contextMenu {
+                    Button("Rename…") {
+                        collectionToRename = collection
+                        showRenameSheet = true
+                    }
+                }
             }
         }
         .listStyle(.sidebar)
