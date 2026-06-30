@@ -15,6 +15,10 @@ struct CollectionsListView: View {
     @State private var pendingImportTargetID: UUID? = nil
     @State private var showRenameSheet = false
     @State private var collectionToRename: PhotoCollection? = nil
+    @State private var showDeleteAlert = false
+    @State private var collectionToDelete: PhotoCollection? = nil
+    @State private var showDirWarning = false
+    @State private var dirWarningMessage = ""
 
     /// Image file types the app can import.
     private static let allowedImageTypes: [UTType] = [
@@ -89,6 +93,19 @@ struct CollectionsListView: View {
         .popover(isPresented: $showCollectionPickerPopover) {
             collectionPickerPopover
         }
+        .alert("Delete Collection", isPresented: $showDeleteAlert, presenting: collectionToDelete) { collection in
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                deleteCollection(collection)
+            }
+        } message: { collection in
+            Text("\"\(collection.name)\" contains \(collection.photos.count) photo(s). The metadata file will be removed, but photo files on disk will not be deleted.")
+        }
+        .alert("Directory Not Empty", isPresented: $showDirWarning) {
+            Button("OK") {}
+        } message: {
+            Text(dirWarningMessage)
+        }
     }
 
     // MARK: - Empty State
@@ -133,6 +150,17 @@ struct CollectionsListView: View {
                     Button("Rename…") {
                         collectionToRename = collection
                         showRenameSheet = true
+                    }
+
+                    Divider()
+
+                    Button("Delete…") {
+                        collectionToDelete = collection
+                        if collection.photos.isEmpty {
+                            deleteCollection(collection)
+                        } else {
+                            showDeleteAlert = true
+                        }
                     }
                 }
             }
@@ -233,6 +261,37 @@ struct CollectionsListView: View {
         let jsonURL = settings.collectionFileURL(for: folderURL)
         let data = try JSONEncoder().encode(collection)
         try data.write(to: jsonURL)
+    }
+
+    // MARK: - Delete Collection
+
+    private func deleteCollection(_ collection: PhotoCollection) {
+        let fm = FileManager.default
+
+        guard let folderPath = collection.folderPath else {
+            collections.removeAll { $0.id == collection.id }
+            return
+        }
+
+        let folderURL = URL(fileURLWithPath: folderPath, isDirectory: true)
+        let jsonURL = settings.collectionFileURL(for: folderURL)
+
+        // Remove the metadata file
+        try? fm.removeItem(at: jsonURL)
+
+        // Check if directory is now empty
+        if let remaining = try? fm.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: nil, options: .skipsHiddenFiles),
+           remaining.isEmpty {
+            // Directory is empty — remove it
+            try? fm.removeItem(at: folderURL)
+        } else {
+            // Directory still has files — warn
+            dirWarningMessage = "The collection directory could not be deleted because it still contains files."
+            showDirWarning = true
+        }
+
+        // Remove from list
+        collections.removeAll { $0.id == collection.id }
     }
 
     // MARK: - Import Flow
