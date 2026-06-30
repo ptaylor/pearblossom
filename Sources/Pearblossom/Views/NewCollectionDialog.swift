@@ -8,8 +8,10 @@ struct NewCollectionDialog: View {
     @State private var name: String = ""
     @State private var description: String = ""
     @State private var nameError: String? = nil
+    @State private var importAfterCreation: Bool = false
 
     var onCreated: ((PhotoCollection) -> Void)?
+    var onCreatedAndImport: ((PhotoCollection) -> Void)?
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -43,6 +45,9 @@ struct NewCollectionDialog: View {
                     .font(.caption)
                     .foregroundColor(.red)
             }
+
+            Toggle("Import photos into this collection", isOn: $importAfterCreation)
+                .font(.body)
 
             HStack {
                 Spacer()
@@ -98,7 +103,13 @@ struct NewCollectionDialog: View {
             try data.write(to: fileURL)
 
             onCreated?(collection)
-            dismiss()
+
+            if importAfterCreation {
+                dismiss()
+                onCreatedAndImport?(collection)
+            } else {
+                dismiss()
+            }
         } catch {
             nameError = "Could not create collection: \(error.localizedDescription)"
         }

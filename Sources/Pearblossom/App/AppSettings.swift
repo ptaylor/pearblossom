@@ -12,6 +12,7 @@ final class AppSettings: ObservableObject {
     private enum Keys {
         static let collectionsRoot = "collectionsRoot"
         static let copyOnImport = "copyOnImport"
+        static let collectionFileName = "collectionFileName"
     }
 
     // MARK: - Defaults
@@ -41,6 +42,13 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// The filename used for collection metadata files (default: ".collection.json").
+    @Published var collectionFileName: String {
+        didSet {
+            defaults.set(collectionFileName, forKey: Keys.collectionFileName)
+        }
+    }
+
     // MARK: - Init
 
     private init() {
@@ -55,6 +63,13 @@ final class AppSettings: ObservableObject {
 
         // Load copy-on-import preference (default false = reference-only)
         self.copyOnImport = defaults.bool(forKey: Keys.copyOnImport)
+
+        // Load collection file name (default ".collection.json")
+        if let name = defaults.string(forKey: Keys.collectionFileName), !name.isEmpty {
+            self.collectionFileName = name
+        } else {
+            self.collectionFileName = ".collection.json"
+        }
 
         // Ensure the directory exists
         ensureDirectoryExists(at: collectionsRoot)
@@ -75,8 +90,8 @@ final class AppSettings: ObservableObject {
         collectionsRoot.appendingPathComponent(name, isDirectory: true)
     }
 
-    /// URL for the .collection.json file inside a collection folder.
+    /// URL for the collection metadata file inside a collection folder.
     func collectionFileURL(for folderURL: URL) -> URL {
-        folderURL.appendingPathComponent(".collection.json")
+        folderURL.appendingPathComponent(collectionFileName)
     }
 }

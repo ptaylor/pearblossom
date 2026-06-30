@@ -12,7 +12,7 @@ struct SettingsView: View {
                 .tabItem { Label("General", systemImage: "gear") }
                 .padding()
         }
-        .frame(width: 450, height: 320)
+        .frame(width: 450, height: 380)
     }
 }
 
@@ -52,10 +52,19 @@ private struct GeneralSettingsTab: View {
                     .fill(Color(nsColor: .controlBackgroundColor))
             )
 
-            Text("New collections will be created as subfolders here. Each collection stores a .collection.json file alongside your photos.")
+            Text("New collections will be created as subfolders here.")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Collection metadata filename")
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+
+                TextField(".collection.json", text: $settings.collectionFileName)
+                    .textFieldStyle(.roundedBorder)
+            }
 
             Divider()
 

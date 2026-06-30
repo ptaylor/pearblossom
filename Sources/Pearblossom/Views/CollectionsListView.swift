@@ -12,6 +12,12 @@ struct CollectionsListView: View {
     @State private var showImportPicker = false
     @State private var pendingImportURLs: [URL]? = nil
     @State private var showCollectionPickerPopover = false
+    @State private var pendingImportTargetID: UUID? = nil
+
+    /// Image file types the app can import.
+    private static let allowedImageTypes: [UTType] = [
+        .jpeg, .png, .tiff, .heic, .bmp, .gif
+    ]
 
     // MARK: - Body
 
@@ -56,11 +62,15 @@ struct CollectionsListView: View {
         .sheet(isPresented: $showNewCollectionSheet) {
             NewCollectionDialog { newCollection in
                 collections.append(newCollection)
+            } onCreatedAndImport: { newCollection in
+                collections.append(newCollection)
+                pendingImportTargetID = newCollection.id
+                showImportPicker = true
             }
         }
         .fileImporter(
             isPresented: $showImportPicker,
-            allowedContentTypes: [.image],
+            allowedContentTypes: Self.allowedImageTypes,
             allowsMultipleSelection: true
         ) { result in
             handleFileImportResult(result)
@@ -225,8 +235,13 @@ struct CollectionsListView: View {
         case .success(let urls):
             pendingImportURLs = urls
 
-            if let selectedID = selectedCollectionID,
-               let collection = collections.first(where: { $0.id == selectedID }) {
+            // Check for a pending import target (from "create + import" flow)
+            if let targetID = pendingImportTargetID,
+               let collection = collections.first(where: { $0.id == targetID }) {
+                pendingImportTargetID = nil
+                importPhotos(into: collection)
+            } else if let selectedID = selectedCollectionID,
+                      let collection = collections.first(where: { $0.id == selectedID }) {
                 // Import directly into selected collection
                 importPhotos(into: collection)
             } else {
@@ -236,6 +251,7 @@ struct CollectionsListView: View {
         case .failure(let error):
             print("Import failed: \(error.localizedDescription)")
             pendingImportURLs = nil
+            pendingImportTargetID = nil
         }
     }
 
