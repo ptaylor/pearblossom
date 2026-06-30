@@ -353,18 +353,39 @@ struct CollectionsListView: View {
 
         let folderURL = URL(fileURLWithPath: folderPath, isDirectory: true)
         let jsonURL = settings.collectionFileURL(for: folderURL)
+        let thumbsDir = folderURL.appendingPathComponent(ThumbnailGenerator.thumbnailsDirName, isDirectory: true)
 
-        // Remove the metadata file
+        // 1. Delete cached thumbnail files
+        for photo in collection.photos {
+            if let thumbPath = photo.thumbnailPath {
+                try? fm.removeItem(at: URL(fileURLWithPath: thumbPath))
+            }
+        }
+
+        // 2. Remove .thumbnails/ directory if empty
+        var thumbDirWarning: String? = nil
+        if fm.fileExists(atPath: thumbsDir.path) {
+            if let remaining = try? fm.contentsOfDirectory(at: thumbsDir, includingPropertiesForKeys: nil, options: .skipsHiddenFiles),
+               remaining.isEmpty {
+                try? fm.removeItem(at: thumbsDir)
+            } else {
+                thumbDirWarning = ".thumbnails directory still contains files and was not removed."
+            }
+        }
+
+        // 3. Remove the metadata file
         try? fm.removeItem(at: jsonURL)
 
-        // Check if directory is now empty
+        // 4. Check if main directory is now empty
         if let remaining = try? fm.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: nil, options: .skipsHiddenFiles),
            remaining.isEmpty {
-            // Directory is empty — remove it
             try? fm.removeItem(at: folderURL)
         } else {
-            // Directory still has files — warn
-            dirWarningMessage = "The collection directory could not be deleted because it still contains files."
+            var msg = "The collection directory could not be deleted because it still contains files."
+            if let thumbWarn = thumbDirWarning {
+                msg += " \(thumbWarn)"
+            }
+            dirWarningMessage = msg
             showDirWarning = true
         }
 
