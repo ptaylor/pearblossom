@@ -14,6 +14,8 @@ final class AppSettings: ObservableObject {
         static let copyOnImport = "copyOnImport"
         static let collectionFileName = "collectionFileName"
         static let debugLoggingEnabled = "debugLoggingEnabled"
+        static let collectionSortOrder = "collectionSortOrder"
+        static let collectionSortAscending = "collectionSortAscending"
     }
 
     // MARK: - Defaults
@@ -57,6 +59,20 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// Sort order for the collections list (default: "dateModified").
+    @Published var collectionSortOrder: String {
+        didSet {
+            defaults.set(collectionSortOrder, forKey: Keys.collectionSortOrder)
+        }
+    }
+
+    /// Whether collection sort is ascending (default: false = descending).
+    @Published var collectionSortAscending: Bool {
+        didSet {
+            defaults.set(collectionSortAscending, forKey: Keys.collectionSortAscending)
+        }
+    }
+
     // MARK: - Init
 
     private init() {
@@ -84,6 +100,14 @@ final class AppSettings: ObservableObject {
             self.debugLoggingEnabled = defaults.bool(forKey: Keys.debugLoggingEnabled)
         } else {
             self.debugLoggingEnabled = true
+        }
+
+        // Load collection sort preferences (default: dateModified descending)
+        self.collectionSortOrder = defaults.string(forKey: Keys.collectionSortOrder) ?? "dateModified"
+        if defaults.object(forKey: Keys.collectionSortAscending) != nil {
+            self.collectionSortAscending = defaults.bool(forKey: Keys.collectionSortAscending)
+        } else {
+            self.collectionSortAscending = false
         }
 
         // Ensure the directory exists

@@ -20,11 +20,42 @@ struct CollectionsListView: View {
     @State private var showDirWarning = false
     @State private var dirWarningMessage = ""
     @State private var expandedCollectionID: UUID? = nil
+    @State private var selectedPhotoIDs: Set<UUID> = []
+    // Sort prefs are persisted in AppSettings, mirrored here for binding
+    @State private var sortOrder: CollectionSortOrder
+    @State private var sortAscending: Bool
+
+    init() {
+        let settings = AppSettings.shared
+        _sortOrder = State(initialValue: CollectionSortOrder(rawValue: settings.collectionSortOrder) ?? .dateModified)
+        _sortAscending = State(initialValue: settings.collectionSortAscending)
+    }
 
     /// Image file types the app can import.
     private static let allowedImageTypes: [UTType] = [
         .jpeg, .png, .tiff, .heic, .bmp, .gif
     ]
+
+    // MARK: - Sort
+
+    enum CollectionSortOrder: String, CaseIterable {
+        case name = "Name"
+        case dateCreated = "Date Created"
+        case dateModified = "Date Modified"
+    }
+
+    private var sortedCollections: [PhotoCollection] {
+        let result: [PhotoCollection]
+        switch sortOrder {
+        case .name:
+            result = collections.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        case .dateCreated:
+            result = collections.sorted { $0.createdAt > $1.createdAt }
+        case .dateModified:
+            result = collections.sorted { $0.modifiedAt > $1.modifiedAt }
+        }
+        return sortAscending ? result.reversed() : result
+    }
 
     // MARK: - Body
 
@@ -46,7 +77,40 @@ struct CollectionsListView: View {
                 }
                 .help("Import Photos")
 
+                Menu {
+                    Picker("Sort By", selection: $sortOrder) {
+                        ForEach(CollectionSortOrder.allCases, id: \.self) { order in
+                            Text(order.rawValue).tag(order)
+                        }
+                    }
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
+                }
+                .menuIndicator(.hidden)
+                .help("Sort Collections")
+                .onChange(of: sortOrder) { _, new in
+                    AppSettings.shared.collectionSortOrder = new.rawValue
+                }
+
+                Button {
+                    sortAscending.toggle()
+                    AppSettings.shared.collectionSortAscending = sortAscending
+                } label: {
+                    Image(systemName: sortAscending ? "arrow.up" : "arrow.down")
+                }
+                .help(sortAscending ? "Sort Ascending" : "Sort Descending")
+
                 Spacer()
+
+                // Remove selected button
+                if !selectedPhotoIDs.isEmpty {
+                    Button {
+                        removeSelectedPhotos()
+                    } label: {
+                        Image(systemName: "trash")
+                    }
+                    .help("Remove \(selectedPhotoIDs.count) Selected Photo\(selectedPhotoIDs.count > 1 ? "s" : "")")
+                }
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
@@ -77,9 +141,10 @@ struct CollectionsListView: View {
             }
         }
         .sheet(item: $collectionToRename) { collection in
-            RenameCollectionDialog(collection: collection) { newName in
+            RenameCollectionDialog(collection: collection) { newName, newDescription in
                 if let index = collections.firstIndex(where: { $0.id == collection.id }) {
                     collections[index].name = newName
+                    collections[index].description = newDescription
                     collections[index].folderPath = settings.collectionFolderURL(named: newName).path
                     collections[index].modifiedAt = Date()
                 }
@@ -133,20 +198,15 @@ struct CollectionsListView: View {
 
     private var collectionList: some View {
         List(selection: $selectedCollectionID) {
-            ForEach(collections) { collection in
-                // Collection header row
-                HStack {
-                    Image(systemName: expandedCollectionID == collection.id ? "folder" : "folder")
-                        .foregroundColor(.accentColor)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(collection.name)
-                            .font(.body)
-                        Text("\(collection.photos.count) photo\(collection.photos.count == 1 ? "" : "s")")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+            ForEach(sortedCollections) { collection in
+                CollectionRow(
+                    collection: collection,
+                    isExpanded: expandedCollectionID == collection.id,
+                    onEdit: {
+                        collectionToRename = collection
+                        showRenameSheet = true
                     }
-                }
+                )
                 .contentShape(Rectangle())
                 .onTapGesture {
                     selectedCollectionID = collection.id
@@ -164,7 +224,7 @@ struct CollectionsListView: View {
                 .padding(.vertical, 2)
                 .tag(collection.id)
                 .contextMenu {
-                    Button("Rename…") {
+                    Button("Edit…") {
                         collectionToRename = collection
                         showRenameSheet = true
                     }
@@ -193,18 +253,81 @@ struct CollectionsListView: View {
         .listStyle(.sidebar)
     }
 
-    // MARK: - Thumbnail Grid
+    // MARK: - Thumbnail Selection
+
+    private func togglePhotoSelection(_ id: UUID) {
+        if selectedPhotoIDs.contains(id) {
+            selectedPhotoIDs.remove(id)
+        } else {
+            selectedPhotoIDs.insert(id)
+        }
+    }
+
+    /// Shift-select: selects all photos from the first selected one up to the given index.
+    private func toggleShiftSelection(in collection: PhotoCollection, upTo endIndex: Int) {
+        guard !selectedPhotoIDs.isEmpty else {
+            // Nothing selected yet — select just this one
+            let id = collection.photos[endIndex].id
+            selectedPhotoIDs = [id]
+            return
+        }
+
+        // Find the range of indices to select
+        let selectedIndices = collection.photos.enumerated()
+            .filter { selectedPhotoIDs.contains($0.element.id) }
+            .map { $0.offset }
+
+        guard let firstSelected = selectedIndices.min() else { return }
+
+        let rangeStart = min(firstSelected, endIndex)
+        let rangeEnd = max(firstSelected, endIndex)
+
+        for i in rangeStart...rangeEnd {
+            selectedPhotoIDs.insert(collection.photos[i].id)
+        }
+    }
+
+    private func removePhotos(_ ids: Set<UUID>, from collection: PhotoCollection) {
+        guard let index = collections.firstIndex(where: { $0.id == collection.id }) else { return }
+
+        var updated = collections[index]
+        let count = ids.count
+        updated.photos.removeAll { ids.contains($0.id) }
+        updated.modifiedAt = Date()
+        try? saveCollection(updated)
+        collections[index] = updated
+        selectedPhotoIDs.subtract(ids)
+
+        Logger.debug("Removed \(count) photo(s) from '\(collection.name)' — \(updated.photos.count) remaining")
+    }
+
+    private func removeSelectedPhotos() {
+        guard !selectedPhotoIDs.isEmpty,
+              let collectionID = expandedCollectionID,
+              let collection = collections.first(where: { $0.id == collectionID }) else { return }
+
+        removePhotos(selectedPhotoIDs, from: collection)
+    }
 
     @ViewBuilder
     private func thumbnailGrid(for collection: PhotoCollection) -> some View {
         let columns: [GridItem] = Array(repeating: GridItem(.flexible(), spacing: 4), count: 3)
 
         LazyVGrid(columns: columns, spacing: 4) {
-            ForEach(collection.photos) { photo in
-                PhotoThumbnailView(sourcePath: photo.path, thumbnailPath: photo.thumbnailPath)
-                    .aspectRatio(1, contentMode: .fill)
-                    .clipped()
-                    .cornerRadius(3)
+            ForEach(Array(collection.photos.enumerated()), id: \.element.id) { index, photo in
+                ThumbnailCell(
+                    photo: photo,
+                    isSelected: selectedPhotoIDs.contains(photo.id),
+                    onTap: {
+                        togglePhotoSelection(photo.id)
+                    },
+                    onShiftTap: {
+                        toggleShiftSelection(in: collection, upTo: index)
+                    },
+                    onRemove: {
+                        removePhotos([photo.id], from: collection)
+                    }
+                )
             }
         }
     }
@@ -491,6 +614,118 @@ struct CollectionsListView: View {
         }
 
         pendingImportURLs = nil
+    }
+}
+
+// MARK: - Thumbnail Cell
+
+/// A single thumbnail in the collection grid, with selection state and remove button.
+private struct ThumbnailCell: View {
+
+    let photo: CollectionPhoto
+    let isSelected: Bool
+    let onTap: () -> Void
+    let onShiftTap: () -> Void
+    let onRemove: () -> Void
+
+    @State private var isHovered: Bool = false
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            PhotoThumbnailView(sourcePath: photo.path, thumbnailPath: photo.thumbnailPath)
+                .aspectRatio(1, contentMode: .fill)
+                .clipped()
+                .cornerRadius(3)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
+                )
+                .opacity(isSelected ? 0.85 : 1.0)
+
+            // ✕ Remove button on hover
+            if isHovered {
+                Button {
+                    onRemove()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 16))
+                        .foregroundColor(.white)
+                        .background(Circle().fill(Color.black.opacity(0.5)))
+                }
+                .buttonStyle(.plain)
+                .padding(2)
+            }
+        }
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isHovered = hovering
+            }
+        }
+        .onTapGesture {
+            onTap()
+        }
+        .simultaneousGesture(
+            TapGesture(count: 1)
+                .modifiers(.shift)
+                .onEnded {
+                    onShiftTap()
+                }
+        )
+    }
+}
+
+// MARK: - Collection Row
+
+/// A single collection row in the sidebar, with hover-revealed edit button.
+private struct CollectionRow: View {
+
+    let collection: PhotoCollection
+    let isExpanded: Bool
+    let onEdit: () -> Void
+
+    @State private var isHovered: Bool = false
+
+    var body: some View {
+        HStack {
+            Image(systemName: isExpanded ? "folder" : "folder")
+                .foregroundColor(.accentColor)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 4) {
+                    Text(collection.name)
+                        .font(.body)
+
+                    if isHovered {
+                        Button {
+                            onEdit()
+                        } label: {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 10))
+                        }
+                        .buttonStyle(.plain)
+                        .help("Edit Collection")
+                    }
+                }
+
+                Text("\(collection.photos.count) photo\(collection.photos.count == 1 ? "" : "s")")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+
+                if !collection.description.isEmpty {
+                    Text(collection.description)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+        }
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.1)) {
+                isHovered = hovering
+            }
+        }
     }
 }
 

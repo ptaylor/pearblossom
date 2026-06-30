@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Sheet for renaming an existing photo collection.
+/// Sheet for editing a collection's name and description.
 struct RenameCollectionDialog: View {
 
     @ObservedObject private var settings = AppSettings.shared
@@ -8,24 +8,26 @@ struct RenameCollectionDialog: View {
     let collection: PhotoCollection
 
     @State private var name: String
+    @State private var description: String
     @State private var nameError: String? = nil
 
-    var onRenamed: ((String) -> Void)?
+    var onSaved: ((String, String) -> Void)?
     @Environment(\.dismiss) private var dismiss
 
-    init(collection: PhotoCollection, onRenamed: ((String) -> Void)? = nil) {
+    init(collection: PhotoCollection, onSaved: ((String, String) -> Void)? = nil) {
         self.collection = collection
-        self.onRenamed = onRenamed
+        self.onSaved = onSaved
         _name = State(initialValue: collection.name)
+        _description = State(initialValue: collection.description)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Rename Collection")
+            Text("Edit Collection")
                 .font(.headline)
 
             VStack(alignment: .leading, spacing: 6) {
-                Text("New Name")
+                Text("Name")
                     .font(.callout)
                     .foregroundColor(.secondary)
 
@@ -34,6 +36,15 @@ struct RenameCollectionDialog: View {
                     .onChange(of: name) { _, _ in
                         nameError = nil
                     }
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Description")
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+
+                TextField("Optional", text: $description)
+                    .textFieldStyle(.roundedBorder)
             }
 
             if let error = nameError {
@@ -50,12 +61,13 @@ struct RenameCollectionDialog: View {
                 }
                 .keyboardShortcut(.escape)
 
-                Button("Rename") {
-                    renameCollection()
+                Button("Save") {
+                    editCollection()
                 }
                 .keyboardShortcut(.return)
                 .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty
-                          || name.trimmingCharacters(in: .whitespaces) == collection.name
+                          || (name.trimmingCharacters(in: .whitespaces) == collection.name
+                              && description == collection.description)
                           || nameIsTaken)
             }
         }
@@ -74,7 +86,7 @@ struct RenameCollectionDialog: View {
 
     // MARK: - Rename
 
-    private func renameCollection() {
+    private func editCollection() {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
 
         guard !trimmed.isEmpty else {
@@ -117,9 +129,9 @@ struct RenameCollectionDialog: View {
             let data = try JSONEncoder().encode(updated)
             try data.write(to: jsonURL)
 
-            onRenamed?(trimmed)
+            onSaved?(trimmed, description.trimmingCharacters(in: .whitespaces))
 
-            Logger.debug("Renamed collection '\(collection.name)' → '\(trimmed)'")
+            Logger.debug("Edited collection '\(collection.name)' → name: '\(trimmed)', description: '\(description)'")
             dismiss()
         } catch {
             nameError = "Could not rename: \(error.localizedDescription)"
