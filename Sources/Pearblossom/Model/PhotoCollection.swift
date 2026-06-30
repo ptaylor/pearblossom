@@ -4,6 +4,7 @@ import Foundation
 struct PhotoCollection: Codable, Identifiable {
     var id: UUID = UUID()
     var name: String
+    var description: String = ""
     var folderPath: String?
     var photos: [CollectionPhoto] = []
     var createdAt: Date = Date()

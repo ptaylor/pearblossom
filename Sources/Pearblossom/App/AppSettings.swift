@@ -11,6 +11,7 @@ final class AppSettings: ObservableObject {
 
     private enum Keys {
         static let collectionsRoot = "collectionsRoot"
+        static let copyOnImport = "copyOnImport"
     }
 
     // MARK: - Defaults
@@ -33,6 +34,13 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// Whether to copy imported photos into the collection folder (vs referencing in-place).
+    @Published var copyOnImport: Bool {
+        didSet {
+            defaults.set(copyOnImport, forKey: Keys.copyOnImport)
+        }
+    }
+
     // MARK: - Init
 
     private init() {
@@ -44,6 +52,9 @@ final class AppSettings: ObservableObject {
             self.collectionsRoot = Self.defaultCollectionsRoot
             defaults.set(Self.defaultCollectionsRoot.path, forKey: Keys.collectionsRoot)
         }
+
+        // Load copy-on-import preference (default false = reference-only)
+        self.copyOnImport = defaults.bool(forKey: Keys.copyOnImport)
 
         // Ensure the directory exists
         ensureDirectoryExists(at: collectionsRoot)

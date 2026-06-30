@@ -36,7 +36,7 @@ struct PearblossomApp: App {
 
             CommandGroup(replacing: .importExport) {
                 Button("Import Photos…") {
-                    // TODO: Implement
+                    NotificationCenter.default.post(name: .triggerImport, object: nil)
                 }
                 .keyboardShortcut("i", modifiers: [.command, .shift])
             }

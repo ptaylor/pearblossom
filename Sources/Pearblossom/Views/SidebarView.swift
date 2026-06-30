@@ -36,40 +36,6 @@ struct SidebarView: View {
     }
 }
 
-/// Placeholder view for the collections list.
-struct CollectionsListView: View {
-    @State private var collections: [PhotoCollection] = []
-
-    var body: some View {
-        if collections.isEmpty {
-            VStack(spacing: 12) {
-                Image(systemName: "photo.on.rectangle.angled")
-                    .font(.system(size: 32))
-                    .foregroundColor(.secondary)
-
-                Text("No Collections")
-                    .font(.headline)
-                    .foregroundColor(.secondary)
-
-                Text("Import photos to get started.")
-                    .font(.caption)
-                    .foregroundColor(Color(nsColor: .tertiaryLabelColor))
-
-                Button("Import Photos…") {
-                    // TODO: Implement photo import
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            List(collections) { collection in
-                Label(collection.name, systemImage: "folder")
-            }
-        }
-    }
-}
-
 /// Placeholder view for the collages list.
 struct CollagesListView: View {
     @State private var collages: [CollageProject] = []

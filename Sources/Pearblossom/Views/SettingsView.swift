@@ -12,7 +12,7 @@ struct SettingsView: View {
                 .tabItem { Label("General", systemImage: "gear") }
                 .padding()
         }
-        .frame(width: 450, height: 250)
+        .frame(width: 450, height: 320)
     }
 }
 
@@ -53,6 +53,16 @@ private struct GeneralSettingsTab: View {
             )
 
             Text("New collections will be created as subfolders here. Each collection stores a .collection.json file alongside your photos.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
+
+            Toggle("Copy photos into collection folder on import", isOn: $settings.copyOnImport)
+                .font(.body)
+
+            Text("When off, photos are referenced in-place (no copies). When on, imported files are copied into the collection folder.")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
