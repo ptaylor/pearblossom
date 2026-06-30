@@ -127,3 +127,13 @@ When asked to implement a non-trivial feature or change, do not jump straight in
 2. **Present options with recommendations** — lay out the viable approaches, trade-offs, and recommend the best fit given the architecture
 3. **Resolve dependencies first** — if the change touches multiple concerns (data model, UI, persistence), walk through the implications before implementing
 4. **Confirm the approach** — get explicit agreement before writing code
+
+## Logging
+
+All non-trivial events must be logged using the `Logger` utility (`Utilities/Logger.swift`):
+
+- **`Logger.debug("message")`** — for diagnostic events (app startup/shutdown, collection operations, import/export, state changes). Respects the debug logging setting.
+- **`Logger.warn("message")`** — for unexpected but handled conditions (missing files, recoverable errors).
+- **`Logger.error("message")`** — for actual failures (file I/O errors, decode failures).
+
+Rule of thumb: if the event would help someone diagnose a problem later, log it. Log at minimum: app lifecycle, collection CRUD, import/export, and any file I/O operation that could fail.

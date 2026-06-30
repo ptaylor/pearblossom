@@ -113,6 +113,8 @@ struct NewCollectionDialog: View {
 
             onCreated?(collection)
 
+            Logger.debug("Created collection '\(trimmed)' — importAfterCreation: \(importAfterCreation)")
+
             if importAfterCreation {
                 dismiss()
                 onCreatedAndImport?(collection)

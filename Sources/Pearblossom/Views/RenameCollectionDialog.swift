@@ -118,6 +118,8 @@ struct RenameCollectionDialog: View {
             try data.write(to: jsonURL)
 
             onRenamed?(trimmed)
+
+            Logger.debug("Renamed collection '\(collection.name)' → '\(trimmed)'")
             dismiss()
         } catch {
             nameError = "Could not rename: \(error.localizedDescription)"

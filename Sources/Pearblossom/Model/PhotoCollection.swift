@@ -14,5 +14,6 @@ struct PhotoCollection: Codable, Identifiable {
 struct CollectionPhoto: Codable, Identifiable {
     var id: UUID = UUID()
     var path: String
+    var thumbnailPath: String? = nil
     var addedAt: Date = Date()
 }

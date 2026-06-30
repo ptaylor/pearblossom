@@ -16,6 +16,17 @@ See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the full architecture reference —
 
 See [`AGENTS.md`](AGENTS.md) for LLM coding assistant conventions and instructions.
 
+## Viewing Logs
+
+Pearblossom uses Apple's unified logging system. Debug logging is enabled by default (toggle in Settings → General → Developer).
+
+**In Terminal:**
+```bash
+log stream --predicate 'subsystem == "com.pearblossom"' --level debug
+```
+
+**In Console.app** (`/Applications/Utilities/Console`): filter by `subsystem:com.pearblossom`.
+
 ## Status
 
 Early design phase. Implementation will proceed in stages.

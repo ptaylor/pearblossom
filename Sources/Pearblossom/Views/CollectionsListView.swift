@@ -19,6 +19,7 @@ struct CollectionsListView: View {
     @State private var collectionToDelete: PhotoCollection? = nil
     @State private var showDirWarning = false
     @State private var dirWarningMessage = ""
+    @State private var expandedCollectionID: UUID? = nil
 
     /// Image file types the app can import.
     private static let allowedImageTypes: [UTType] = [
@@ -61,6 +62,7 @@ struct CollectionsListView: View {
         }
         .onAppear {
             loadCollections()
+            Logger.debug("CollectionsListView appeared, loaded \(collections.count) collection(s)")
         }
         .onReceive(NotificationCenter.default.publisher(for: .triggerImport)) { _ in
             handleImport()
@@ -132,8 +134,9 @@ struct CollectionsListView: View {
     private var collectionList: some View {
         List(selection: $selectedCollectionID) {
             ForEach(collections) { collection in
+                // Collection header row
                 HStack {
-                    Image(systemName: "folder")
+                    Image(systemName: expandedCollectionID == collection.id ? "folder" : "folder")
                         .foregroundColor(.accentColor)
 
                     VStack(alignment: .leading, spacing: 2) {
@@ -142,6 +145,20 @@ struct CollectionsListView: View {
                         Text("\(collection.photos.count) photo\(collection.photos.count == 1 ? "" : "s")")
                             .font(.caption)
                             .foregroundColor(.secondary)
+                    }
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    selectedCollectionID = collection.id
+                    withAnimation(.easeInOut(duration: 0.15)) {
+                        if expandedCollectionID == collection.id {
+                            expandedCollectionID = nil
+                            Logger.debug("Collapsed collection '\(collection.name)'")
+                        } else {
+                            expandedCollectionID = collection.id
+                            Logger.debug("Expanded collection '\(collection.name)' — \(collection.photos.count) photo(s)")
+                            generateMissingThumbnails(for: collection)
+                        }
                     }
                 }
                 .padding(.vertical, 2)
@@ -163,9 +180,33 @@ struct CollectionsListView: View {
                         }
                     }
                 }
+
+                // Thumbnail grid when expanded
+                if expandedCollectionID == collection.id && !collection.photos.isEmpty {
+                    thumbnailGrid(for: collection)
+                        .padding(.leading, 20)
+                        .padding(.bottom, 8)
+                        .listRowInsets(EdgeInsets())
+                }
             }
         }
         .listStyle(.sidebar)
+    }
+
+    // MARK: - Thumbnail Grid
+
+    @ViewBuilder
+    private func thumbnailGrid(for collection: PhotoCollection) -> some View {
+        let columns: [GridItem] = Array(repeating: GridItem(.flexible(), spacing: 4), count: 3)
+
+        LazyVGrid(columns: columns, spacing: 4) {
+            ForEach(collection.photos) { photo in
+                PhotoThumbnailView(sourcePath: photo.path, thumbnailPath: photo.thumbnailPath)
+                    .aspectRatio(1, contentMode: .fill)
+                    .clipped()
+                    .cornerRadius(3)
+            }
+        }
     }
 
     // MARK: - Collection Picker Popover
@@ -263,9 +304,46 @@ struct CollectionsListView: View {
         try data.write(to: jsonURL)
     }
 
+    // MARK: - Missing Thumbnails
+
+    /// Generates thumbnails for photos that don't have one, in the background.
+    private func generateMissingThumbnails(for collection: PhotoCollection) {
+        guard let folderPath = collection.folderPath,
+              let index = collections.firstIndex(where: { $0.id == collection.id }) else { return }
+
+        let folderURL = URL(fileURLWithPath: folderPath, isDirectory: true)
+        let photosWithoutThumbnails = collection.photos.filter { $0.thumbnailPath == nil }
+
+        guard !photosWithoutThumbnails.isEmpty else { return }
+
+        Logger.debug("Generating \(photosWithoutThumbnails.count) missing thumbnail(s) for '\(collection.name)'")
+
+        DispatchQueue.global(qos: .utility).async {
+            var updated = collections[index]
+            var changed = false
+
+            for photo in photosWithoutThumbnails {
+                if let thumbPath = ThumbnailGenerator.generateThumbnail(for: photo.path, in: folderURL),
+                   let photoIndex = updated.photos.firstIndex(where: { $0.id == photo.id }) {
+                    updated.photos[photoIndex].thumbnailPath = thumbPath
+                    changed = true
+                }
+            }
+
+            if changed {
+                updated.modifiedAt = Date()
+                try? self.saveCollection(updated)
+                DispatchQueue.main.async {
+                    self.collections[index] = updated
+                }
+            }
+        }
+    }
+
     // MARK: - Delete Collection
 
     private func deleteCollection(_ collection: PhotoCollection) {
+        Logger.debug("Deleting collection '\(collection.name)' (\(collection.photos.count) photo(s))")
         let fm = FileManager.default
 
         guard let folderPath = collection.folderPath else {
@@ -334,9 +412,12 @@ struct CollectionsListView: View {
     private func importPhotos(into collection: PhotoCollection) {
         guard let urls = pendingImportURLs,
               let index = collections.firstIndex(where: { $0.id == collection.id }) else {
+            Logger.debug("importPhotos: no URLs or collection not found")
             pendingImportURLs = nil
             return
         }
+
+        Logger.debug("importing \(urls.count) files into '\(collection.name)', folderPath: \(collection.folderPath ?? "nil")")
 
         var targetCollection = collections[index]
         var skippedCount = 0
@@ -361,13 +442,22 @@ struct CollectionsListView: View {
                 }
             }
 
-            let photo = CollectionPhoto(path: finalPath)
+            var photo = CollectionPhoto(path: finalPath)
+
+            // Generate thumbnail
+            if let folderPath = targetCollection.folderPath {
+                let folderURL = URL(fileURLWithPath: folderPath, isDirectory: true)
+                photo.thumbnailPath = ThumbnailGenerator.generateThumbnail(for: finalPath, in: folderURL)
+            }
+
             targetCollection.photos.append(photo)
         }
 
         targetCollection.modifiedAt = Date()
         try? saveCollection(targetCollection)
         collections[index] = targetCollection
+
+        Logger.debug("Import complete: \(urls.count - skippedCount) added to '\(targetCollection.name)', \(skippedCount) skipped")
 
         // Show skipped notice
         if skippedCount > 0 {

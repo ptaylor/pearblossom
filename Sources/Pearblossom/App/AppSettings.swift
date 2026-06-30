@@ -13,6 +13,7 @@ final class AppSettings: ObservableObject {
         static let collectionsRoot = "collectionsRoot"
         static let copyOnImport = "copyOnImport"
         static let collectionFileName = "collectionFileName"
+        static let debugLoggingEnabled = "debugLoggingEnabled"
     }
 
     // MARK: - Defaults
@@ -49,6 +50,13 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// Whether debug logging is enabled (default: true).
+    @Published var debugLoggingEnabled: Bool {
+        didSet {
+            defaults.set(debugLoggingEnabled, forKey: Keys.debugLoggingEnabled)
+        }
+    }
+
     // MARK: - Init
 
     private init() {
@@ -69,6 +77,13 @@ final class AppSettings: ObservableObject {
             self.collectionFileName = name
         } else {
             self.collectionFileName = ".collection.json"
+        }
+
+        // Load debug logging preference (default true)
+        if defaults.object(forKey: Keys.debugLoggingEnabled) != nil {
+            self.debugLoggingEnabled = defaults.bool(forKey: Keys.debugLoggingEnabled)
+        } else {
+            self.debugLoggingEnabled = true
         }
 
         // Ensure the directory exists

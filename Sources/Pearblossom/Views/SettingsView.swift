@@ -12,7 +12,7 @@ struct SettingsView: View {
                 .tabItem { Label("General", systemImage: "gear") }
                 .padding()
         }
-        .frame(width: 450, height: 380)
+        .frame(width: 450, height: 460)
     }
 }
 
@@ -72,6 +72,19 @@ private struct GeneralSettingsTab: View {
                 .font(.body)
 
             Text("When off, photos are referenced in-place (no copies). When on, imported files are copied into the collection folder.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
+
+            Text("Developer")
+                .font(.headline)
+
+            Toggle("Debug logging", isOn: $settings.debugLoggingEnabled)
+                .font(.body)
+
+            Text("When on, diagnostic messages are printed to the console (visible in Terminal or Console.app).")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
