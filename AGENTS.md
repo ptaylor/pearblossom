@@ -118,3 +118,12 @@ Do not implement any of these even if the model properties exist:
 2. Prefer the simplest Apple SDK approach — no clever workarounds
 3. No new dependencies
 4. Ask the user if a design decision isn't covered by the plan
+
+## Before Making Changes
+
+When asked to implement a non-trivial feature or change, do not jump straight into code. Always:
+
+1. **Ask clarifying questions** — identify ambiguities, edge cases, and unstated assumptions before writing anything
+2. **Present options with recommendations** — lay out the viable approaches, trade-offs, and recommend the best fit given the architecture
+3. **Resolve dependencies first** — if the change touches multiple concerns (data model, UI, persistence), walk through the implications before implementing
+4. **Confirm the approach** — get explicit agreement before writing code
