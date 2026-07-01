@@ -17,8 +17,8 @@ struct ContentView: View {
             CanvasView(project: $currentProject)
                 .frame(minWidth: 600)
         } detail: {
-            // Inspector: properties for selected items
-            InspectorView()
+            // Inspector: canvas config and properties
+            InspectorView(project: $currentProject)
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 350)
                 .frame(minWidth: 220)
         }

@@ -19,6 +19,10 @@ final class AppSettings: ObservableObject {
         static let thumbnailSize = "thumbnailSize"
         static let collageSortOrder = "collageSortOrder"
         static let collageSortAscending = "collageSortAscending"
+        static let defaultBackgroundRed = "defaultBackgroundRed"
+        static let defaultBackgroundGreen = "defaultBackgroundGreen"
+        static let defaultBackgroundBlue = "defaultBackgroundBlue"
+        static let defaultBorderMargin = "defaultBorderMargin"
     }
 
     // MARK: - Defaults
@@ -115,6 +119,22 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// Default background color for new collages (default: white).
+    @Published var defaultBackgroundColor: CodableColor {
+        didSet {
+            defaults.set(defaultBackgroundColor.red, forKey: Keys.defaultBackgroundRed)
+            defaults.set(defaultBackgroundColor.green, forKey: Keys.defaultBackgroundGreen)
+            defaults.set(defaultBackgroundColor.blue, forKey: Keys.defaultBackgroundBlue)
+        }
+    }
+
+    /// Default border margin in points for new collages (default: 40).
+    @Published var defaultBorderMargin: CGFloat {
+        didSet {
+            defaults.set(defaultBorderMargin, forKey: Keys.defaultBorderMargin)
+        }
+    }
+
     // MARK: - Init
 
     private init() {
@@ -203,6 +223,20 @@ final class AppSettings: ObservableObject {
         } else {
             self.collageSortAscending = false
         }
+
+        // Load default background color (default: white)
+        let bgRed = defaults.double(forKey: Keys.defaultBackgroundRed)
+        let bgGreen = defaults.double(forKey: Keys.defaultBackgroundGreen)
+        let bgBlue = defaults.double(forKey: Keys.defaultBackgroundBlue)
+        if bgRed > 0 || bgGreen > 0 || bgBlue > 0 {
+            self.defaultBackgroundColor = CodableColor(red: bgRed, green: bgGreen, blue: bgBlue, alpha: 1)
+        } else {
+            self.defaultBackgroundColor = .white
+        }
+
+        // Load default border margin (default: 40)
+        let savedMargin = defaults.double(forKey: Keys.defaultBorderMargin)
+        self.defaultBorderMargin = savedMargin > 0 ? savedMargin : 40
 
         // Ensure subdirectories exist (safe to call after all properties initialized)
         prepareDirectories()

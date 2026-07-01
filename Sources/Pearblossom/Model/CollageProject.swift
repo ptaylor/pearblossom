@@ -1,4 +1,5 @@
 import Foundation
+import CoreGraphics
 
 /// A collage project — persisted as a .collage.json file.
 struct CollageProject: Codable, Identifiable {
@@ -11,12 +12,37 @@ struct CollageProject: Codable, Identifiable {
     var canvasHeight: CGFloat = 1500
     var backgroundColor: CodableColor = .white
     var layers: [PhotoLayer] = []
+    var boundingBoxMode: BoundingBoxMode = .definedBorder
+    var borderMargin: CGFloat = 40
+    var manualBoundingBox: CGRect? = nil
     var createdAt: Date = Date()
     var modifiedAt: Date = Date()
 
     enum CodingKeys: String, CodingKey {
         case id, version, name, description, filePath, canvasWidth, canvasHeight
-        case backgroundColor, layers, createdAt, modifiedAt
+        case backgroundColor, layers, boundingBoxMode, borderMargin, manualBoundingBox
+        case createdAt, modifiedAt
+    }
+
+    /// Computes the effective bounding box based on mode and layer positions.
+    func effectiveBoundingBox() -> CGRect {
+        let canvasRect = CGRect(x: 0, y: 0, width: canvasWidth, height: canvasHeight)
+        switch boundingBoxMode {
+        case .manual:
+            return manualBoundingBox ?? canvasRect
+        case .definedBorder:
+            guard !layers.isEmpty else { return canvasRect }
+            let unionRect = layers.reduce(into: CGRect?.none) { result, layer in
+                let layerRect = CGRect(
+                    x: layer.position.x - layer.size.width / 2,
+                    y: layer.position.y - layer.size.height / 2,
+                    width: layer.size.width,
+                    height: layer.size.height
+                )
+                result = result?.union(layerRect) ?? layerRect
+            } ?? canvasRect
+            return unionRect.insetBy(dx: -borderMargin, dy: -borderMargin)
+        }
     }
 
     init(id: UUID = UUID(),
@@ -28,6 +54,9 @@ struct CollageProject: Codable, Identifiable {
          canvasHeight: CGFloat = 1500,
          backgroundColor: CodableColor = .white,
          layers: [PhotoLayer] = [],
+         boundingBoxMode: BoundingBoxMode = .definedBorder,
+         borderMargin: CGFloat = 40,
+         manualBoundingBox: CGRect? = nil,
          createdAt: Date = Date(),
          modifiedAt: Date = Date()) {
         self.id = id
@@ -39,6 +68,9 @@ struct CollageProject: Codable, Identifiable {
         self.canvasHeight = canvasHeight
         self.backgroundColor = backgroundColor
         self.layers = layers
+        self.boundingBoxMode = boundingBoxMode
+        self.borderMargin = borderMargin
+        self.manualBoundingBox = manualBoundingBox
         self.createdAt = createdAt
         self.modifiedAt = modifiedAt
     }
@@ -56,6 +88,9 @@ struct CollageProject: Codable, Identifiable {
         canvasHeight = try container.decodeIfPresent(CGFloat.self, forKey: .canvasHeight) ?? 1500
         backgroundColor = try container.decodeIfPresent(CodableColor.self, forKey: .backgroundColor) ?? .white
         layers = try container.decodeIfPresent([PhotoLayer].self, forKey: .layers) ?? []
+        boundingBoxMode = try container.decodeIfPresent(BoundingBoxMode.self, forKey: .boundingBoxMode) ?? .definedBorder
+        borderMargin = try container.decodeIfPresent(CGFloat.self, forKey: .borderMargin) ?? 40
+        manualBoundingBox = try container.decodeIfPresent(CGRect.self, forKey: .manualBoundingBox)
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         modifiedAt = try container.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? Date()
     }
@@ -89,4 +124,42 @@ struct CodableColor: Codable {
     var alpha: CGFloat
 
     static let white = CodableColor(red: 1, green: 1, blue: 1, alpha: 1)
+    static let black = CodableColor(red: 0, green: 0, blue: 0, alpha: 1)
+
+    init(red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat) {
+        self.red = red
+        self.green = green
+        self.blue = blue
+        self.alpha = alpha
+    }
+
+    init(cgColor: CGColor) {
+        let comps = cgColor.components ?? [0, 0, 0, 1]
+        self.red = comps.count >= 1 ? comps[0] : 0
+        self.green = comps.count >= 2 ? comps[1] : 0
+        self.blue = comps.count >= 3 ? comps[2] : 0
+        self.alpha = comps.count >= 4 ? comps[3] : 1
+    }
+
+    var cgColor: CGColor {
+        CGColor(red: red, green: green, blue: blue, alpha: alpha)
+    }
+
+    /// Greyscale presets for the background picker: 0%, 5%, 10%, 20%, 40%, 60%, 80%, 100%
+    static let grayscalePresets: [CodableColor] = [
+        .black,                                                     // 0%
+        CodableColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1), // 5%
+        CodableColor(red: 0.10, green: 0.10, blue: 0.10, alpha: 1), // 10%
+        CodableColor(red: 0.20, green: 0.20, blue: 0.20, alpha: 1), // 20%
+        CodableColor(red: 0.40, green: 0.40, blue: 0.40, alpha: 1), // 40%
+        CodableColor(red: 0.60, green: 0.60, blue: 0.60, alpha: 1), // 60%
+        CodableColor(red: 0.80, green: 0.80, blue: 0.80, alpha: 1), // 80%
+        .white,                                                     // 100%
+    ]
+}
+
+/// Bounding box mode for the collage canvas.
+enum BoundingBoxMode: String, Codable, CaseIterable {
+    case definedBorder = "definedBorder"
+    case manual = "manual"
 }

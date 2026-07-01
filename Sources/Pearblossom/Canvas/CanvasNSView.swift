@@ -9,12 +9,14 @@ final class CanvasNSView: NSView {
     /// The CIContext used for rendering — Metal-backed on macOS 14+.
     private let ciContext = CIContext()
 
-    /// Background color for the canvas.
-    var canvasBackgroundColor: CGColor = .white
-
     /// The current project, set from SwiftUI.
     var project: CollageProject? {
         didSet { needsDisplay = true }
+    }
+
+    /// The resolved background color from the project, or white.
+    private var currentBackground: CGColor {
+        project?.backgroundColor.cgColor ?? .white
     }
 
     // MARK: - Lifecycle
@@ -22,7 +24,6 @@ final class CanvasNSView: NSView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
-        layer?.backgroundColor = NSColor.white.cgColor
     }
 
     required init?(coder: NSCoder) {
@@ -36,14 +37,31 @@ final class CanvasNSView: NSView {
 
         guard let context = NSGraphicsContext.current?.cgContext else { return }
 
-        // Fill with canvas background
-        context.setFillColor(canvasBackgroundColor)
+        // Fill with project's background color
+        context.setFillColor(currentBackground)
         context.fill(bounds)
 
-        // Draw placeholder text if no project is loaded
+        // Draw bounding box
+        if let proj = project {
+            drawBoundingBox(proj.effectiveBoundingBox(), on: currentBackground, in: context)
+        }
+
+        // Draw placeholder text if no layers
         if project?.layers.isEmpty ?? true {
             drawPlaceholder(in: context)
         }
+    }
+
+    private func drawBoundingBox(_ rect: CGRect, on background: CGColor, in context: CGContext) {
+        // Choose a contrasting dash color
+        let bgBrightness = (background.components?[0] ?? 1) + (background.components?[1] ?? 1) + (background.components?[2] ?? 1)
+        let dashColor: CGColor = bgBrightness > 1.5 ? NSColor.black.withAlphaComponent(0.5).cgColor : NSColor.white.withAlphaComponent(0.5).cgColor
+
+        context.setStrokeColor(dashColor)
+        context.setLineWidth(1.5)
+        context.setLineDash(phase: 0, lengths: [8, 4])
+        context.stroke(rect)
+        context.setLineDash(phase: 0, lengths: [])
     }
 
     private func drawPlaceholder(in context: CGContext) {

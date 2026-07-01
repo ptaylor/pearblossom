@@ -100,11 +100,13 @@ struct NewCollageDialog: View {
                 try fm.createDirectory(at: settings.collagesDir, withIntermediateDirectories: true)
             }
 
-            // Build the collage
+            // Build the collage with global defaults
             let collage = CollageProject(
                 name: trimmed,
                 description: description,
-                filePath: fileURL.path
+                filePath: fileURL.path,
+                backgroundColor: settings.defaultBackgroundColor,
+                borderMargin: settings.defaultBorderMargin
             )
 
             // Write .collage.json
