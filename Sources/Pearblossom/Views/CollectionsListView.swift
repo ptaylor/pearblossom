@@ -77,26 +77,57 @@ struct CollectionsListView: View {
                 }
                 .help("Import Photos")
 
+                Button {
+                    loadCollections()
+                    Logger.debug("Collections list refreshed")
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .help("Refresh Collections")
+
                 Menu {
-                    Picker("Sort By", selection: $sortOrder) {
-                        ForEach(CollectionSortOrder.allCases, id: \.self) { order in
-                            Text(order.rawValue).tag(order)
+                    ForEach(CollectionSortOrder.allCases, id: \.self) { order in
+                        Button {
+                            if sortOrder == order {
+                                // Toggle direction if same sort field selected
+                                sortAscending.toggle()
+                                AppSettings.shared.collectionSortAscending = sortAscending
+                            } else {
+                                sortOrder = order
+                                AppSettings.shared.collectionSortOrder = order.rawValue
+                            }
+                        } label: {
+                            HStack {
+                                Text(order.rawValue)
+                                if sortOrder == order {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+
+                    Divider()
+
+                    Button {
+                        sortAscending.toggle()
+                        AppSettings.shared.collectionSortAscending = sortAscending
+                    } label: {
+                        HStack {
+                            Text(sortAscending ? "Ascending" : "Descending")
+                            Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
                         }
                     }
                 } label: {
-                    Image(systemName: "arrow.up.arrow.down")
+                    Image(systemName: "line.3.horizontal.decrease")
                 }
                 .menuIndicator(.hidden)
                 .help("Sort Collections")
-                .onChange(of: sortOrder) { _, new in
-                    AppSettings.shared.collectionSortOrder = new.rawValue
-                }
 
                 Button {
                     sortAscending.toggle()
                     AppSettings.shared.collectionSortAscending = sortAscending
                 } label: {
-                    Image(systemName: sortAscending ? "arrow.up" : "arrow.down")
+                    Image(systemName: sortAscending ? "chevron.up" : "chevron.down")
                 }
                 .help(sortAscending ? "Sort Ascending" : "Sort Descending")
 
@@ -147,6 +178,7 @@ struct CollectionsListView: View {
                     collections[index].description = newDescription
                     collections[index].folderPath = settings.collectionFolderURL(named: newName).path
                     collections[index].modifiedAt = Date()
+                    try? saveCollection(collections[index])
                 }
             }
         }
@@ -166,7 +198,11 @@ struct CollectionsListView: View {
                 deleteCollection(collection)
             }
         } message: { collection in
-            Text("\"\(collection.name)\" contains \(collection.photos.count) photo(s). The metadata file will be removed, but photo files on disk will not be deleted.")
+            if collection.importMode == .copy {
+                Text("\"\(collection.name)\" contains \(collection.photos.count) photo(s). The collection folder, metadata, and all copied photo files will be permanently deleted.")
+            } else {
+                Text("\"\(collection.name)\" contains \(collection.photos.count) photo(s). The metadata file will be removed, but photo files on disk will not be deleted.")
+            }
         }
         .alert("Directory Not Empty", isPresented: $showDirWarning) {
             Button("OK") {}
@@ -205,6 +241,14 @@ struct CollectionsListView: View {
                     onEdit: {
                         collectionToRename = collection
                         showRenameSheet = true
+                    },
+                    onDelete: {
+                        collectionToDelete = collection
+                        if collection.photos.isEmpty {
+                            deleteCollection(collection)
+                        } else {
+                            showDeleteAlert = true
+                        }
                     }
                 )
                 .contentShape(Rectangle())
@@ -466,8 +510,9 @@ struct CollectionsListView: View {
     // MARK: - Delete Collection
 
     private func deleteCollection(_ collection: PhotoCollection) {
-        Logger.debug("Deleting collection '\(collection.name)' (\(collection.photos.count) photo(s))")
+        Logger.debug("Deleting collection '\(collection.name)' (\(collection.photos.count) photo(s), importMode: \(collection.importMode.rawValue))")
         let fm = FileManager.default
+        let collectionsRoot = settings.collectionsRoot.path
 
         guard let folderPath = collection.folderPath else {
             collections.removeAll { $0.id == collection.id }
@@ -478,14 +523,26 @@ struct CollectionsListView: View {
         let jsonURL = settings.collectionFileURL(for: folderURL)
         let thumbsDir = folderURL.appendingPathComponent(ThumbnailGenerator.thumbnailsDirName, isDirectory: true)
 
-        // 1. Delete cached thumbnail files
+        // 1. If import mode is copy, delete photo files (only within collections root)
+        if collection.importMode == .copy {
+            for photo in collection.photos {
+                let photoURL = URL(fileURLWithPath: photo.path)
+                // Safety: never delete files outside the collections root
+                if photoURL.path.hasPrefix(collectionsRoot) {
+                    try? fm.removeItem(at: photoURL)
+                    Logger.debug("Deleted copied photo: \(photo.path)")
+                }
+            }
+        }
+
+        // 2. Delete cached thumbnail files
         for photo in collection.photos {
             if let thumbPath = photo.thumbnailPath {
                 try? fm.removeItem(at: URL(fileURLWithPath: thumbPath))
             }
         }
 
-        // 2. Remove .thumbnails/ directory if empty
+        // 3. Remove .thumbnails/ directory if empty
         var thumbDirWarning: String? = nil
         if fm.fileExists(atPath: thumbsDir.path) {
             if let remaining = try? fm.contentsOfDirectory(at: thumbsDir, includingPropertiesForKeys: nil, options: .skipsHiddenFiles),
@@ -496,10 +553,10 @@ struct CollectionsListView: View {
             }
         }
 
-        // 3. Remove the metadata file
+        // 4. Remove the metadata file
         try? fm.removeItem(at: jsonURL)
 
-        // 4. Check if main directory is now empty
+        // 5. Check if main directory is now empty
         if let remaining = try? fm.contentsOfDirectory(at: folderURL, includingPropertiesForKeys: nil, options: .skipsHiddenFiles),
            remaining.isEmpty {
             try? fm.removeItem(at: folderURL)
@@ -575,9 +632,9 @@ struct CollectionsListView: View {
                 continue
             }
 
-            // Copy if enabled
+            // Copy if collection import mode is .copy
             var finalPath = path
-            if settings.copyOnImport,
+            if targetCollection.importMode == .copy,
                let folderPath = targetCollection.folderPath {
                 let folderURL = URL(fileURLWithPath: folderPath, isDirectory: true)
                 let destURL = folderURL.appendingPathComponent(url.lastPathComponent)
@@ -676,12 +733,13 @@ private struct ThumbnailCell: View {
 
 // MARK: - Collection Row
 
-/// A single collection row in the sidebar, with hover-revealed edit button.
+/// A single collection row in the sidebar, with hover-revealed edit and delete buttons.
 private struct CollectionRow: View {
 
     let collection: PhotoCollection
     let isExpanded: Bool
     let onEdit: () -> Void
+    let onDelete: () -> Void
 
     @State private var isHovered: Bool = false
 
@@ -691,21 +749,8 @@ private struct CollectionRow: View {
                 .foregroundColor(.accentColor)
 
             VStack(alignment: .leading, spacing: 2) {
-                HStack(spacing: 4) {
-                    Text(collection.name)
-                        .font(.body)
-
-                    if isHovered {
-                        Button {
-                            onEdit()
-                        } label: {
-                            Image(systemName: "pencil")
-                                .font(.system(size: 10))
-                        }
-                        .buttonStyle(.plain)
-                        .help("Edit Collection")
-                    }
-                }
+                Text(collection.name)
+                    .font(.body)
 
                 Text("\(collection.photos.count) photo\(collection.photos.count == 1 ? "" : "s")")
                     .font(.caption)
@@ -720,6 +765,28 @@ private struct CollectionRow: View {
             }
 
             Spacer()
+
+            if isHovered {
+                HStack(spacing: 8) {
+                    Button {
+                        onEdit()
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 14))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Edit Collection")
+
+                    Button {
+                        onDelete()
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 14))
+                    }
+                    .buttonStyle(.plain)
+                    .help("Delete Collection")
+                }
+            }
         }
         .onHover { hovering in
             withAnimation(.easeInOut(duration: 0.1)) {

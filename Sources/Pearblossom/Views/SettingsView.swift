@@ -12,7 +12,7 @@ struct SettingsView: View {
                 .tabItem { Label("General", systemImage: "gear") }
                 .padding()
         }
-        .frame(width: 450, height: 460)
+        .frame(width: 450, height: 540)
     }
 }
 
@@ -71,10 +71,33 @@ private struct GeneralSettingsTab: View {
             Toggle("Copy photos into collection folder on import", isOn: $settings.copyOnImport)
                 .font(.body)
 
-            Text("When off, photos are referenced in-place (no copies). When on, imported files are copied into the collection folder.")
+            Text("Default import mode for new collections. Can be overridden per collection at creation time.")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+
+            Divider()
+
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("Thumbnail size")
+                        .font(.body)
+
+                    Spacer()
+
+                    Text("\(Int(settings.thumbnailSize)) pt")
+                        .font(.body)
+                        .monospacedDigit()
+                        .foregroundColor(.secondary)
+                }
+
+                Slider(value: $settings.thumbnailSize, in: 80...400, step: 20)
+
+                Text("Existing thumbnails are not regenerated. Only newly imported photos use this setting.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
 
             Divider()
 

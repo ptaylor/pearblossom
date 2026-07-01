@@ -4,11 +4,13 @@ import Foundation
 /// Generates and caches JPEG thumbnails for collection photos.
 enum ThumbnailGenerator {
 
-    /// Desired maximum dimension for thumbnails in points.
-    static let thumbnailSize: CGFloat = 200
-
     /// Name of the hidden subfolder for cached thumbnails.
     static let thumbnailsDirName = ".thumbnails"
+
+    /// The current thumbnail size from app settings.
+    static var thumbnailSize: CGFloat {
+        AppSettings.shared.thumbnailSize
+    }
 
     // MARK: - Public API
 
@@ -36,7 +38,8 @@ enum ThumbnailGenerator {
         // Load and resize
         guard let sourceImage = NSImage(contentsOf: sourceURL) else { return nil }
 
-        let resized = sourceImage.resizedToFit(thumbnailSize)
+        let size = thumbnailSize
+        let resized = sourceImage.resizedToFit(size)
         guard let cgImage = resized.cgImage(forProposedRect: nil, context: nil, hints: nil) else {
             return nil
         }

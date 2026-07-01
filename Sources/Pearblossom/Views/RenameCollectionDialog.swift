@@ -47,6 +47,23 @@ struct RenameCollectionDialog: View {
                     .textFieldStyle(.roundedBorder)
             }
 
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Import Mode")
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+
+                HStack {
+                    Image(systemName: collection.importMode == .copy ? "doc.on.doc" : "link")
+                        .foregroundColor(.secondary)
+                    Text(collection.importMode == .copy ? "Copy files into collection" : "Reference files in place")
+                        .foregroundColor(.secondary)
+                }
+
+                Text("Import mode cannot be changed after creation.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
             if let error = nameError {
                 Label(error, systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
@@ -88,17 +105,30 @@ struct RenameCollectionDialog: View {
 
     private func editCollection() {
         let trimmed = name.trimmingCharacters(in: .whitespaces)
+        let trimmedDesc = description.trimmingCharacters(in: .whitespaces)
 
         guard !trimmed.isEmpty else {
             nameError = "Name cannot be empty."
             return
         }
 
-        guard trimmed != collection.name else {
+        let nameChanged = trimmed != collection.name
+        let descChanged = trimmedDesc != (collection.description.trimmingCharacters(in: .whitespaces))
+
+        guard nameChanged || descChanged else {
             dismiss()
             return
         }
 
+        // If only description changed, update in place without renaming
+        if !nameChanged {
+            onSaved?(trimmed, trimmedDesc)
+            Logger.debug("Edited collection '\(collection.name)' — description updated")
+            dismiss()
+            return
+        }
+
+        // Name changed — rename folder on disk
         let newFolderURL = settings.collectionFolderURL(named: trimmed)
         let fm = FileManager.default
 
@@ -122,6 +152,7 @@ struct RenameCollectionDialog: View {
             // Update .collection.json inside the renamed folder
             var updated = collection
             updated.name = trimmed
+            updated.description = trimmedDesc
             updated.folderPath = newFolderURL.path
             updated.modifiedAt = Date()
 
@@ -129,9 +160,9 @@ struct RenameCollectionDialog: View {
             let data = try JSONEncoder().encode(updated)
             try data.write(to: jsonURL)
 
-            onSaved?(trimmed, description.trimmingCharacters(in: .whitespaces))
+            onSaved?(trimmed, trimmedDesc)
 
-            Logger.debug("Edited collection '\(collection.name)' → name: '\(trimmed)', description: '\(description)'")
+            Logger.debug("Edited collection '\(collection.name)' → name: '\(trimmed)', description: '\(trimmedDesc)'")
             dismiss()
         } catch {
             nameError = "Could not rename: \(error.localizedDescription)"

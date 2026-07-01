@@ -112,6 +112,10 @@ Do not implement any of these even if the model properties exist:
 - Printing
 - Localization
 
+## File Deletion Safety Rule
+
+**CRITICAL**: Pearblossom must never delete or modify files outside the collections root directory (`AppSettings.shared.collectionsRoot`). Before deleting any file, verify its absolute path starts with the collections root path. This applies to all file operations — collection deletion, photo removal, thumbnail cleanup, and any future features. Files linked by reference (outside the collections root) are read-only. Only files created by Pearblossom within its own directory tree may be modified or deleted.
+
 ## When in Doubt
 
 1. Re-read `ARCHITECTURE.md`

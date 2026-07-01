@@ -16,6 +16,7 @@ final class AppSettings: ObservableObject {
         static let debugLoggingEnabled = "debugLoggingEnabled"
         static let collectionSortOrder = "collectionSortOrder"
         static let collectionSortAscending = "collectionSortAscending"
+        static let thumbnailSize = "thumbnailSize"
     }
 
     // MARK: - Defaults
@@ -73,6 +74,13 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// Desired maximum dimension for collection photo thumbnails in points (default: 200).
+    @Published var thumbnailSize: CGFloat {
+        didSet {
+            defaults.set(thumbnailSize, forKey: Keys.thumbnailSize)
+        }
+    }
+
     // MARK: - Init
 
     private init() {
@@ -109,6 +117,10 @@ final class AppSettings: ObservableObject {
         } else {
             self.collectionSortAscending = false
         }
+
+        // Load thumbnail size (default: 200)
+        let savedThumbSize = defaults.double(forKey: Keys.thumbnailSize)
+        self.thumbnailSize = savedThumbSize > 0 ? savedThumbSize : 200
 
         // Ensure the directory exists
         ensureDirectoryExists(at: collectionsRoot)

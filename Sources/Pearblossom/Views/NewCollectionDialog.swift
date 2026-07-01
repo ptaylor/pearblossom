@@ -9,10 +9,18 @@ struct NewCollectionDialog: View {
     @State private var description: String = ""
     @State private var nameError: String? = nil
     @State private var importAfterCreation: Bool = false
+    @State private var importMode: ImportMode
 
     var onCreated: ((PhotoCollection) -> Void)?
     var onCreatedAndImport: ((PhotoCollection) -> Void)?
     @Environment(\.dismiss) private var dismiss
+
+    init(onCreated: ((PhotoCollection) -> Void)? = nil,
+         onCreatedAndImport: ((PhotoCollection) -> Void)? = nil) {
+        self.onCreated = onCreated
+        self.onCreatedAndImport = onCreatedAndImport
+        _importMode = State(initialValue: AppSettings.shared.copyOnImport ? .copy : .reference)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -46,7 +54,26 @@ struct NewCollectionDialog: View {
                     .foregroundColor(.red)
             }
 
-            Toggle("Import photos into this collection", isOn: $importAfterCreation)
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Import Mode")
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+
+                Picker("Import Mode", selection: $importMode) {
+                    Text("Copy files into collection").tag(ImportMode.copy)
+                    Text("Reference files in place").tag(ImportMode.reference)
+                }
+                .pickerStyle(.radioGroup)
+
+                Text(importMode == .copy
+                     ? "Photos will be copied into the collection folder."
+                     : "Photos will be referenced at their current location.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            Toggle("Import photos after creation", isOn: $importAfterCreation)
                 .font(.body)
 
             HStack {
@@ -103,7 +130,8 @@ struct NewCollectionDialog: View {
             let collection = PhotoCollection(
                 name: trimmed,
                 description: description,
-                folderPath: folderURL.path
+                folderPath: folderURL.path,
+                importMode: importMode
             )
 
             // Write .collection.json
@@ -111,15 +139,14 @@ struct NewCollectionDialog: View {
             let data = try JSONEncoder().encode(collection)
             try data.write(to: fileURL)
 
-            onCreated?(collection)
-
             Logger.debug("Created collection '\(trimmed)' — importAfterCreation: \(importAfterCreation)")
 
+            dismiss()
+
             if importAfterCreation {
-                dismiss()
                 onCreatedAndImport?(collection)
             } else {
-                dismiss()
+                onCreated?(collection)
             }
         } catch {
             nameError = "Could not create collection: \(error.localizedDescription)"
