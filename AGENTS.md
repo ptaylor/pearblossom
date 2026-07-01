@@ -121,7 +121,7 @@ Do not implement any of these even if the model properties exist:
 
 ## Before Making Changes
 
-When asked to implement a non-trivial feature or change, do not jump straight into code. Always:
+When asked to implement a non-trivial feature or change — or to create a plan for one — do not jump straight into code (or the plan). Always:
 
 1. **Ask clarifying questions** — identify ambiguities, edge cases, and unstated assumptions before writing anything
 2. **Present options with recommendations** — lay out the viable approaches, trade-offs, and recommend the best fit given the architecture
