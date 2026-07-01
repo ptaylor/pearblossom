@@ -90,6 +90,9 @@ struct RenameCollectionDialog: View {
         }
         .padding()
         .frame(width: 350)
+        .onSubmit {
+            editCollection()
+        }
     }
 
     // MARK: - Validation

@@ -10,19 +10,29 @@ final class AppSettings: ObservableObject {
     // MARK: - Keys
 
     private enum Keys {
-        static let collectionsRoot = "collectionsRoot"
+        static let collectionsRoot = "collectionsRoot"  // Now the root directory
         static let copyOnImport = "copyOnImport"
         static let collectionFileName = "collectionFileName"
         static let debugLoggingEnabled = "debugLoggingEnabled"
         static let collectionSortOrder = "collectionSortOrder"
         static let collectionSortAscending = "collectionSortAscending"
         static let thumbnailSize = "thumbnailSize"
+        static let collageSortOrder = "collageSortOrder"
+        static let collageSortAscending = "collageSortAscending"
     }
 
     // MARK: - Defaults
 
-    /// Default collections root: ~/Pictures/Pearblossom Collections
-    static let defaultCollectionsRoot: URL = {
+    /// Default root directory: ~/Pictures/Pearblossom/
+    static let defaultRoot: URL = {
+        let pictures = FileManager.default.urls(
+            for: .picturesDirectory, in: .userDomainMask
+        ).first!
+        return pictures.appendingPathComponent("Pearblossom", isDirectory: true)
+    }()
+
+    /// The old default collections root (for migration).
+    private static let legacyCollectionsRoot: URL = {
         let pictures = FileManager.default.urls(
             for: .picturesDirectory, in: .userDomainMask
         ).first!
@@ -31,12 +41,22 @@ final class AppSettings: ObservableObject {
 
     // MARK: - Published Settings
 
-    /// The root directory where collection folders are stored.
+    /// The root directory for all Pearblossom data. Collections live in `Collections/`, collages in `Collages/`.
     @Published var collectionsRoot: URL {
         didSet {
             defaults.set(collectionsRoot.path, forKey: Keys.collectionsRoot)
             ensureDirectoryExists(at: collectionsRoot)
         }
+    }
+
+    /// The subdirectory where collection folders are stored.
+    var collectionsDir: URL {
+        collectionsRoot.appendingPathComponent("Collections", isDirectory: true)
+    }
+
+    /// The subdirectory where collage .json files are stored.
+    var collagesDir: URL {
+        collectionsRoot.appendingPathComponent("Collages", isDirectory: true)
     }
 
     /// Whether to copy imported photos into the collection folder (vs referencing in-place).
@@ -81,16 +101,70 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// Sort order for the collages list (default: "dateModified").
+    @Published var collageSortOrder: String {
+        didSet {
+            defaults.set(collageSortOrder, forKey: Keys.collageSortOrder)
+        }
+    }
+
+    /// Whether collage sort is ascending (default: false = descending).
+    @Published var collageSortAscending: Bool {
+        didSet {
+            defaults.set(collageSortAscending, forKey: Keys.collageSortAscending)
+        }
+    }
+
     // MARK: - Init
 
     private init() {
-        // Load saved path or use default
-        if let savedPath = defaults.string(forKey: Keys.collectionsRoot),
-           !savedPath.isEmpty {
-            self.collectionsRoot = URL(fileURLWithPath: savedPath, isDirectory: true)
+        let fm = FileManager.default
+        let newCollectionsDir = Self.defaultRoot.appendingPathComponent("Collections", isDirectory: true)
+
+        // Determine the root directory, migrating from legacy layout if needed
+        if let savedPath = defaults.string(forKey: Keys.collectionsRoot), !savedPath.isEmpty {
+            let savedURL = URL(fileURLWithPath: savedPath, isDirectory: true)
+
+            // Migrate from old default "Pearblossom Collections" → "Pearblossom/Collections/"
+            if savedURL.path == Self.legacyCollectionsRoot.path,
+               fm.fileExists(atPath: savedPath) {
+                // Ensure parent exists
+                try? fm.createDirectory(at: Self.defaultRoot, withIntermediateDirectories: true)
+                // Remove empty destination if it exists from a previous partial run
+                if fm.fileExists(atPath: newCollectionsDir.path) {
+                    let contents = (try? fm.contentsOfDirectory(at: newCollectionsDir, includingPropertiesForKeys: nil, options: .skipsHiddenFiles)) ?? []
+                    if contents.isEmpty {
+                        try? fm.removeItem(at: newCollectionsDir)
+                    }
+                }
+                // Try moving the whole directory, or move individual contents
+                if !fm.fileExists(atPath: newCollectionsDir.path) {
+                    do {
+                        try fm.moveItem(at: savedURL, to: newCollectionsDir)
+                        print("[Pearblossom] Migrated collections from legacy path to \(newCollectionsDir.path)")
+                    } catch {
+                        print("[Pearblossom] ERROR: Migration move failed: \(error.localizedDescription)")
+                    }
+                } else {
+                    // Destination exists with content — move individual items
+                    print("[Pearblossom] Migrating individual collection folders from legacy path")
+                    if let items = try? fm.contentsOfDirectory(at: savedURL, includingPropertiesForKeys: nil, options: .skipsHiddenFiles) {
+                        for item in items {
+                            let dest = newCollectionsDir.appendingPathComponent(item.lastPathComponent)
+                            if !fm.fileExists(atPath: dest.path) {
+                                try? fm.moveItem(at: item, to: dest)
+                            }
+                        }
+                    }
+                }
+                self.collectionsRoot = Self.defaultRoot
+                defaults.set(Self.defaultRoot.path, forKey: Keys.collectionsRoot)
+            } else {
+                self.collectionsRoot = savedURL
+            }
         } else {
-            self.collectionsRoot = Self.defaultCollectionsRoot
-            defaults.set(Self.defaultCollectionsRoot.path, forKey: Keys.collectionsRoot)
+            self.collectionsRoot = Self.defaultRoot
+            defaults.set(Self.defaultRoot.path, forKey: Keys.collectionsRoot)
         }
 
         // Load copy-on-import preference (default false = reference-only)
@@ -122,8 +196,45 @@ final class AppSettings: ObservableObject {
         let savedThumbSize = defaults.double(forKey: Keys.thumbnailSize)
         self.thumbnailSize = savedThumbSize > 0 ? savedThumbSize : 200
 
-        // Ensure the directory exists
-        ensureDirectoryExists(at: collectionsRoot)
+        // Load collage sort preferences (default: dateModified descending)
+        self.collageSortOrder = defaults.string(forKey: Keys.collageSortOrder) ?? "dateModified"
+        if defaults.object(forKey: Keys.collageSortAscending) != nil {
+            self.collageSortAscending = defaults.bool(forKey: Keys.collageSortAscending)
+        } else {
+            self.collageSortAscending = false
+        }
+
+        // Ensure subdirectories exist (safe to call after all properties initialized)
+        prepareDirectories()
+
+        // Migrate any collection folders that may be sitting directly in the root
+        // (from earlier versions that didn't use a Collections/ subdirectory)
+        migrateRootCollections()
+    }
+
+    /// Move any collection folders (.collection.json present) from root into Collections/.
+    private func migrateRootCollections() {
+        let fm = FileManager.default
+        guard let rootContents = try? fm.contentsOfDirectory(
+            at: collectionsRoot, includingPropertiesForKeys: nil, options: .skipsHiddenFiles
+        ) else { return }
+
+        for item in rootContents {
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: item.path, isDirectory: &isDir), isDir.boolValue else { continue }
+            // Skip the Collections and Collages subdirectories themselves
+            let name = item.lastPathComponent
+            if name == "Collections" || name == "Collages" { continue }
+            // Check if this folder contains a .collection.json
+            let jsonURL = item.appendingPathComponent(collectionFileName)
+            if fm.fileExists(atPath: jsonURL.path) {
+                let dest = collectionsDir.appendingPathComponent(name)
+                if !fm.fileExists(atPath: dest.path) {
+                    try? fm.moveItem(at: item, to: dest)
+                    print("[Pearblossom] Migrated collection '\(name)' from root to Collections/")
+                }
+            }
+        }
     }
 
     // MARK: - Helpers
@@ -136,13 +247,26 @@ final class AppSettings: ObservableObject {
         }
     }
 
-    /// URL for a specific collection folder inside the collections root.
+    /// Ensure all required subdirectories exist. Safe to call after migration.
+    func prepareDirectories() {
+        ensureDirectoryExists(at: collectionsDir)
+        ensureDirectoryExists(at: collagesDir)
+    }
+
+    /// URL for a specific collection folder inside the collections directory.
     func collectionFolderURL(named name: String) -> URL {
-        collectionsRoot.appendingPathComponent(name, isDirectory: true)
+        ensureDirectoryExists(at: collectionsDir)
+        return collectionsDir.appendingPathComponent(name, isDirectory: true)
     }
 
     /// URL for the collection metadata file inside a collection folder.
     func collectionFileURL(for folderURL: URL) -> URL {
         folderURL.appendingPathComponent(collectionFileName)
+    }
+
+    /// URL for a collage .json file in the collages directory.
+    func collageFileURL(named name: String) -> URL {
+        ensureDirectoryExists(at: collagesDir)
+        return collagesDir.appendingPathComponent("\(name).collage.json")
     }
 }

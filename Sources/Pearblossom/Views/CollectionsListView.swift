@@ -361,6 +361,7 @@ struct CollectionsListView: View {
             ForEach(Array(collection.photos.enumerated()), id: \.element.id) { index, photo in
                 ThumbnailCell(
                     photo: photo,
+                    folderPath: collection.folderPath,
                     isSelected: selectedPhotoIDs.contains(photo.id),
                     onTap: {
                         togglePhotoSelection(photo.id)
@@ -427,8 +428,13 @@ struct CollectionsListView: View {
     // MARK: - Collection Loading
 
     private func loadCollections() {
-        let root = settings.collectionsRoot
+        let root = settings.collectionsDir
         let fm = FileManager.default
+
+        // Ensure directory exists
+        if !fm.fileExists(atPath: root.path) {
+            try? fm.createDirectory(at: root, withIntermediateDirectories: true)
+        }
 
         guard let contents = try? fm.contentsOfDirectory(
             at: root, includingPropertiesForKeys: nil, options: .skipsHiddenFiles
@@ -455,6 +461,27 @@ struct CollectionsListView: View {
             if collection.folderPath != folderURL.path {
                 collection.folderPath = folderURL.path
                 collection.modifiedAt = Date()
+            }
+
+            // Migrate absolute paths inside the collection folder to relative paths
+            var migratedPaths = false
+            if let fp = collection.folderPath {
+                for i in collection.photos.indices {
+                    let photo = collection.photos[i]
+                    // Photo path
+                    if photo.path.hasPrefix("/"), photo.path.hasPrefix(fp + "/") {
+                        collection.photos[i].path = String(photo.path.dropFirst(fp.count + 1))
+                        migratedPaths = true
+                    }
+                    // Thumbnail path
+                    if let thumb = photo.thumbnailPath, thumb.hasPrefix("/"), thumb.hasPrefix(fp + "/") {
+                        collection.photos[i].thumbnailPath = String(thumb.dropFirst(fp.count + 1))
+                        migratedPaths = true
+                    }
+                }
+            }
+            if migratedPaths {
+                collection.modifiedAt = Date()
                 try? saveCollection(collection)
             }
 
@@ -464,11 +491,19 @@ struct CollectionsListView: View {
     }
 
     private func saveCollection(_ collection: PhotoCollection) throws {
-        guard let folderPath = collection.folderPath,
-              let folderURL = URL(string: "file://" + folderPath) else { return }
+        guard let folderPath = collection.folderPath else { return }
+        let folderURL = URL(fileURLWithPath: folderPath, isDirectory: true)
         let jsonURL = settings.collectionFileURL(for: folderURL)
         let data = try JSONEncoder().encode(collection)
         try data.write(to: jsonURL)
+    }
+
+    /// Converts an absolute path to a path relative to the given folder.
+    private func relativePath(_ absolute: String, from folder: String) -> String {
+        if absolute.hasPrefix(folder + "/") {
+            return String(absolute.dropFirst(folder.count + 1))
+        }
+        return absolute
     }
 
     // MARK: - Missing Thumbnails
@@ -490,9 +525,11 @@ struct CollectionsListView: View {
             var changed = false
 
             for photo in photosWithoutThumbnails {
-                if let thumbPath = ThumbnailGenerator.generateThumbnail(for: photo.path, in: folderURL),
+                let resolved = photo.resolvedPath(relativeTo: folderPath)
+                if let absoluteThumb = ThumbnailGenerator.generateThumbnail(for: resolved, in: folderURL),
                    let photoIndex = updated.photos.firstIndex(where: { $0.id == photo.id }) {
-                    updated.photos[photoIndex].thumbnailPath = thumbPath
+                    // Store relative path so it survives collection renames
+                    updated.photos[photoIndex].thumbnailPath = relativePath(absoluteThumb, from: folderPath)
                     changed = true
                 }
             }
@@ -526,19 +563,20 @@ struct CollectionsListView: View {
         // 1. If import mode is copy, delete photo files (only within collections root)
         if collection.importMode == .copy {
             for photo in collection.photos {
-                let photoURL = URL(fileURLWithPath: photo.path)
+                let resolved = photo.resolvedPath(relativeTo: folderPath)
+                let photoURL = URL(fileURLWithPath: resolved)
                 // Safety: never delete files outside the collections root
                 if photoURL.path.hasPrefix(collectionsRoot) {
                     try? fm.removeItem(at: photoURL)
-                    Logger.debug("Deleted copied photo: \(photo.path)")
+                    Logger.debug("Deleted copied photo: \(resolved)")
                 }
             }
         }
 
         // 2. Delete cached thumbnail files
         for photo in collection.photos {
-            if let thumbPath = photo.thumbnailPath {
-                try? fm.removeItem(at: URL(fileURLWithPath: thumbPath))
+            if let resolved = photo.resolvedThumbnailPath(relativeTo: folderPath) {
+                try? fm.removeItem(at: URL(fileURLWithPath: resolved))
             }
         }
 
@@ -624,31 +662,43 @@ struct CollectionsListView: View {
         var skippedCount = 0
 
         for url in urls {
-            let path = url.path
+            let sourcePath = url.path
 
-            // Check for duplicates
-            if targetCollection.photos.contains(where: { $0.path == path }) {
+            // Check for duplicates (compare resolved paths)
+            let isDuplicate = targetCollection.photos.contains { existing in
+                existing.resolvedPath(relativeTo: targetCollection.folderPath) == sourcePath
+            }
+            if isDuplicate {
                 skippedCount += 1
                 continue
             }
 
             // Copy if collection import mode is .copy
-            var finalPath = path
+            var photoPath: String
             if targetCollection.importMode == .copy,
                let folderPath = targetCollection.folderPath {
                 let folderURL = URL(fileURLWithPath: folderPath, isDirectory: true)
                 let destURL = folderURL.appendingPathComponent(url.lastPathComponent)
                 if (try? FileManager.default.copyItem(at: url, to: destURL)) != nil {
-                    finalPath = destURL.path
+                    // Store relative path for copied photos (survives renames)
+                    photoPath = url.lastPathComponent
+                } else {
+                    photoPath = sourcePath
                 }
+            } else {
+                photoPath = sourcePath
             }
 
-            var photo = CollectionPhoto(path: finalPath)
+            var photo = CollectionPhoto(path: photoPath)
 
             // Generate thumbnail
             if let folderPath = targetCollection.folderPath {
                 let folderURL = URL(fileURLWithPath: folderPath, isDirectory: true)
-                photo.thumbnailPath = ThumbnailGenerator.generateThumbnail(for: finalPath, in: folderURL)
+                let resolved = photo.resolvedPath(relativeTo: folderPath)
+                if let absoluteThumb = ThumbnailGenerator.generateThumbnail(for: resolved, in: folderURL) {
+                    // Store relative path so it survives collection renames
+                    photo.thumbnailPath = relativePath(absoluteThumb, from: folderPath)
+                }
             }
 
             targetCollection.photos.append(photo)
@@ -680,6 +730,7 @@ struct CollectionsListView: View {
 private struct ThumbnailCell: View {
 
     let photo: CollectionPhoto
+    let folderPath: String?
     let isSelected: Bool
     let onTap: () -> Void
     let onShiftTap: () -> Void
@@ -689,7 +740,8 @@ private struct ThumbnailCell: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            PhotoThumbnailView(sourcePath: photo.path, thumbnailPath: photo.thumbnailPath)
+            PhotoThumbnailView(sourcePath: photo.resolvedPath(relativeTo: folderPath),
+                               thumbnailPath: photo.resolvedThumbnailPath(relativeTo: folderPath))
                 .aspectRatio(1, contentMode: .fill)
                 .clipped()
                 .cornerRadius(3)

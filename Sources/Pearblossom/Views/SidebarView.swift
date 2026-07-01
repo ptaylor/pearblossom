@@ -9,6 +9,7 @@ struct SidebarView: View {
         case collages = "Collages"
     }
 
+    @Binding var selectedProject: CollageProject?
     @State private var selectedTab: SidebarTab = .collections
 
     var body: some View {
@@ -30,41 +31,7 @@ struct SidebarView: View {
             case .collections:
                 CollectionsListView()
             case .collages:
-                CollagesListView()
-            }
-        }
-    }
-}
-
-/// Placeholder view for the collages list.
-struct CollagesListView: View {
-    @State private var collages: [CollageProject] = []
-
-    var body: some View {
-        if collages.isEmpty {
-            VStack(spacing: 12) {
-                Image(systemName: "square.3.layers.3d")
-                    .font(.system(size: 32))
-                    .foregroundColor(.secondary)
-
-                Text("No Collages")
-                    .font(.headline)
-                    .foregroundColor(.secondary)
-
-                Text("Create a new collage to begin.")
-                    .font(.caption)
-                    .foregroundColor(Color(nsColor: .tertiaryLabelColor))
-
-                Button("New Collage…") {
-                    // TODO: Implement new collage
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            List(collages) { collage in
-                Label(collage.filePath ?? "Untitled", systemImage: "doc")
+                CollagesListView(selectedProject: $selectedProject)
             }
         }
     }

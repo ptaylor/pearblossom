@@ -93,6 +93,9 @@ struct NewCollectionDialog: View {
         }
         .padding()
         .frame(width: 350)
+        .onSubmit {
+            createCollection()
+        }
     }
 
     // MARK: - Validation

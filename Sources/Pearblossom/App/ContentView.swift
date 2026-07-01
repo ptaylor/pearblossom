@@ -9,7 +9,7 @@ struct ContentView: View {
     var body: some View {
         NavigationSplitView {
             // Sidebar: Collections and Collages in tabs
-            SidebarView()
+            SidebarView(selectedProject: $currentProject)
                 .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 350)
                 .frame(minWidth: 220)
         } content: {

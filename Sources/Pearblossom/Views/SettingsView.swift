@@ -25,12 +25,12 @@ private struct GeneralSettingsTab: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Collections")
+            Text("Root Folder")
                 .font(.headline)
 
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Collections Folder")
+                    Text("Root Folder")
                         .font(.body)
 
                     Text(settings.collectionsRoot.path)
@@ -52,7 +52,7 @@ private struct GeneralSettingsTab: View {
                     .fill(Color(nsColor: .controlBackgroundColor))
             )
 
-            Text("New collections will be created as subfolders here.")
+            Text("Collections and collages are stored as subdirectories inside the root folder.")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

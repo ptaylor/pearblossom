@@ -56,7 +56,25 @@ struct PhotoCollection: Codable, Identifiable {
 
 struct CollectionPhoto: Codable, Identifiable {
     var id: UUID = UUID()
+    /// Path to the photo. Absolute for referenced photos, relative to the collection folder for copied photos.
     var path: String
+    /// Path to the cached thumbnail. Relative to the collection folder (inside .thumbnails/).
     var thumbnailPath: String? = nil
     var addedAt: Date = Date()
+
+    /// Resolves the photo path to an absolute path. For relative paths (copied photos),
+    /// prepends the collection folder path. For absolute paths (referenced photos), returns as-is.
+    func resolvedPath(relativeTo folderPath: String?) -> String {
+        guard let folder = folderPath else { return path }
+        if path.hasPrefix("/") { return path }
+        return (folder as NSString).appendingPathComponent(path)
+    }
+
+    /// Resolves the thumbnail path to an absolute path.
+    func resolvedThumbnailPath(relativeTo folderPath: String?) -> String? {
+        guard let thumb = thumbnailPath else { return nil }
+        guard let folder = folderPath else { return thumb }
+        if thumb.hasPrefix("/") { return thumb }
+        return (folder as NSString).appendingPathComponent(thumb)
+    }
 }
