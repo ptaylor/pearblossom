@@ -67,6 +67,14 @@ final class CanvasNSView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    override var acceptsFirstResponder: Bool { true }
+
+    override func becomeFirstResponder() -> Bool {
+        // Visual feedback: subtle highlight when focused
+        layer?.borderWidth = 0
+        return super.becomeFirstResponder()
+    }
+
     // MARK: - Drawing
 
     override func draw(_ dirtyRect: NSRect) {
@@ -427,6 +435,7 @@ final class CanvasNSView: NSView {
     // MARK: - Mouse Events
 
     override func mouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(self)
         isDragging = true
         let point = convert(event.locationInWindow, from: nil)
 
@@ -561,14 +570,71 @@ final class CanvasNSView: NSView {
     }
 
     override func keyDown(with event: NSEvent) {
-        if (event.keyCode == 51 || event.keyCode == 117), !selectedLayerIDs.isEmpty, var proj = project {
+        guard !selectedLayerIDs.isEmpty, let id = selectedLayerIDs.first,
+              var proj = project else {
+            super.keyDown(with: event)
+            return
+        }
+
+        let cmd = event.modifierFlags.contains(.command)
+
+        switch event.keyCode {
+        case 51, 117: // Delete / Forward Delete
             proj.layers.removeAll { selectedLayerIDs.contains($0.id) }
             selectedLayerIDs = []
             proj.modifiedAt = Date()
             project = proj
+            cachedComposite = nil
             needsDisplay = true
             onLayersChanged?()
-        } else { super.keyDown(with: event) }
+
+        case 33: // [ key
+            if cmd {
+                proj.sendToBack(layerID: id)
+            } else {
+                proj.moveDown(layerID: id)
+            }
+            project = proj
+            cachedComposite = nil
+            needsDisplay = true
+            onLayersChanged?()
+
+        case 30: // ] key
+            if cmd {
+                proj.bringToFront(layerID: id)
+            } else {
+                proj.moveUp(layerID: id)
+            }
+            project = proj
+            cachedComposite = nil
+            needsDisplay = true
+            onLayersChanged?()
+
+        case 126: // ↑ arrow
+            if cmd {
+                proj.bringToFront(layerID: id)
+            } else {
+                proj.moveUp(layerID: id)
+            }
+            project = proj
+            cachedComposite = nil
+            needsDisplay = true
+            onLayersChanged?()
+
+        case 125: // ↓ arrow
+            if cmd {
+                proj.sendToBack(layerID: id)
+            } else {
+                proj.moveDown(layerID: id)
+            }
+            project = proj
+            cachedComposite = nil
+            needsDisplay = true
+            onLayersChanged?()
+
+        default:
+            super.keyDown(with: event)
+        }
     }
 
     // MARK: - Context Menu
