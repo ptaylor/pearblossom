@@ -329,7 +329,8 @@ final class CanvasNSView: NSView {
             paths = urls.map { $0.path }
         }
         if paths.isEmpty, let strings = pasteboard.readObjects(forClasses: [NSString.self], options: nil) as? [String] {
-            paths = strings
+            // Support newline-separated paths (multi-select drag from collection browser)
+            paths = strings.flatMap { $0.components(separatedBy: "\n").filter { !$0.isEmpty } }
         }
         guard !paths.isEmpty, let window = window else { return false }
         let mouseScreen = NSEvent.mouseLocation

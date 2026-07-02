@@ -365,8 +365,10 @@ struct CollectionsListView: View {
             ForEach(Array(collection.photos.enumerated()), id: \.element.id) { index, photo in
                 ThumbnailCell(
                     photo: photo,
+                    collection: collection,
                     folderPath: collection.folderPath,
                     isSelected: selectedPhotoIDs.contains(photo.id),
+                    selectedPhotoIDs: selectedPhotoIDs,
                     onTap: {
                         togglePhotoSelection(photo.id)
                     },
@@ -734,8 +736,10 @@ struct CollectionsListView: View {
 private struct ThumbnailCell: View {
 
     let photo: CollectionPhoto
+    let collection: PhotoCollection
     let folderPath: String?
     let isSelected: Bool
+    let selectedPhotoIDs: Set<UUID>
     let onTap: () -> Void
     let onShiftTap: () -> Void
     let onRemove: () -> Void
@@ -785,9 +789,17 @@ private struct ThumbnailCell: View {
                 }
         )
         .onDrag {
-            let path = photo.resolvedPath(relativeTo: folderPath)
-            let provider = NSItemProvider(object: path as NSString)
-            return provider
+            // If multiple photos are selected, drag all of them.
+            // Use newline-separated paths so the canvas can parse them.
+            let selectedPhotos: [CollectionPhoto]
+            if selectedPhotoIDs.count > 1 && selectedPhotoIDs.contains(photo.id) {
+                selectedPhotos = collection.photos.filter { selectedPhotoIDs.contains($0.id) }
+            } else {
+                selectedPhotos = [photo]
+            }
+            let allPaths = selectedPhotos.map { $0.resolvedPath(relativeTo: folderPath) }
+            let combined = allPaths.joined(separator: "\n")
+            return NSItemProvider(object: combined as NSString)
         } preview: {
             // Show a scaled-down preview during drag
             PhotoThumbnailView(sourcePath: photo.resolvedPath(relativeTo: folderPath),
