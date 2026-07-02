@@ -125,6 +125,12 @@ struct InspectorView: View {
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
+
+            Toggle("Show Bounding Box", isOn: binding.showBoundingBox)
+                .font(.body)
+                .onChange(of: binding.wrappedValue.showBoundingBox) { _, _ in
+                    binding.wrappedValue.modifiedAt = Date()
+                }
         }
     }
 

@@ -15,13 +15,14 @@ struct CollageProject: Codable, Identifiable {
     var boundingBoxMode: BoundingBoxMode = .definedBorder
     var borderMargin: CGFloat = 40
     var manualBoundingBox: CGRect? = nil
+    var showBoundingBox: Bool = true
     var createdAt: Date = Date()
     var modifiedAt: Date = Date()
 
     enum CodingKeys: String, CodingKey {
         case id, version, name, description, filePath, canvasWidth, canvasHeight
         case backgroundColor, layers, boundingBoxMode, borderMargin, manualBoundingBox
-        case createdAt, modifiedAt
+        case showBoundingBox, createdAt, modifiedAt
     }
 
     /// Computes the effective bounding box based on mode and layer positions.
@@ -57,6 +58,7 @@ struct CollageProject: Codable, Identifiable {
          boundingBoxMode: BoundingBoxMode = .definedBorder,
          borderMargin: CGFloat = 40,
          manualBoundingBox: CGRect? = nil,
+         showBoundingBox: Bool = true,
          createdAt: Date = Date(),
          modifiedAt: Date = Date()) {
         self.id = id
@@ -71,6 +73,7 @@ struct CollageProject: Codable, Identifiable {
         self.boundingBoxMode = boundingBoxMode
         self.borderMargin = borderMargin
         self.manualBoundingBox = manualBoundingBox
+        self.showBoundingBox = showBoundingBox
         self.createdAt = createdAt
         self.modifiedAt = modifiedAt
     }
@@ -91,6 +94,7 @@ struct CollageProject: Codable, Identifiable {
         boundingBoxMode = try container.decodeIfPresent(BoundingBoxMode.self, forKey: .boundingBoxMode) ?? .definedBorder
         borderMargin = try container.decodeIfPresent(CGFloat.self, forKey: .borderMargin) ?? 40
         manualBoundingBox = try container.decodeIfPresent(CGRect.self, forKey: .manualBoundingBox)
+        showBoundingBox = try container.decodeIfPresent(Bool.self, forKey: .showBoundingBox) ?? true
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         modifiedAt = try container.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? Date()
     }

@@ -61,7 +61,7 @@ final class CanvasNSView: NSView {
             drawPlaceholder(in: cgContext)
         }
 
-        if let proj = project {
+        if let proj = project, proj.showBoundingBox {
             drawBoundingBox(proj.effectiveBoundingBox(), on: currentBackground, in: cgContext)
         }
 

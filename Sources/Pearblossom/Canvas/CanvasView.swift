@@ -21,9 +21,11 @@ struct CanvasView: NSViewRepresentable {
             context.coordinator.handleDrop(paths: paths, at: point, canvas: canvas)
         }
 
-        // Wire up auto-save on canvas mutations
+        // Wire up auto-save on canvas mutations — also push changes back to binding
+        // so Inspector toggles etc. don't overwrite dragged positions with stale data.
         canvas.onLayersChanged = { [weak canvas] in
-            guard let canvas = canvas else { return }
+            guard let canvas = canvas, let proj = canvas.project else { return }
+            context.coordinator.projectBinding.wrappedValue = proj
             context.coordinator.scheduleAutoSave(canvas: canvas)
         }
 
