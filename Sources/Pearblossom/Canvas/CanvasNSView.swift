@@ -252,7 +252,7 @@ final class CanvasNSView: NSView {
               proj.layers.first(where: { $0.id == layer.id }) != nil else { return }
 
         // Rotation knob — small circle above top-center
-        let knobRadius: CGFloat = 5
+        let knobRadius: CGFloat = 4
         let knobCenter = CGPoint(x: layer.position.x, y: rect.minY - 12)
         let knobRect = CGRect(x: knobCenter.x - knobRadius, y: knobCenter.y - knobRadius,
                               width: knobRadius * 2, height: knobRadius * 2)
@@ -269,15 +269,44 @@ final class CanvasNSView: NSView {
         context.addLine(to: knobCenter)
         context.strokePath()
 
-        // Resize handles — four small squares at corners
+        // Rotation symbol — curved arrow centered on the knob, rotated +45°
+        let symbolCX = knobCenter.x
+        let symbolCY = knobCenter.y
+        let symbolR: CGFloat = 10
+        let rotOffset: CGFloat = .pi / 4  // +45° rotation
+        context.setStrokeColor(NSColor.systemBlue.cgColor)
+        context.setLineWidth(1.5)
+        context.setLineCap(.round)
+        context.addArc(center: CGPoint(x: symbolCX, y: symbolCY), radius: symbolR,
+                       startAngle: -.pi / 3 + rotOffset, endAngle: .pi * 2 / 3 + rotOffset, clockwise: true)
+        context.strokePath()
+        // Arrowhead
+        let arrowAngle: CGFloat = .pi * 2 / 3 + rotOffset
+        let arrowTip = CGPoint(x: symbolCX + symbolR * cos(arrowAngle),
+                               y: symbolCY + symbolR * sin(arrowAngle))
+        let arrowLen: CGFloat = 5
+        let a1 = arrowAngle + .pi + 0.5
+        let a2 = arrowAngle + .pi - 0.5
+        context.move(to: arrowTip)
+        context.addLine(to: CGPoint(x: arrowTip.x + arrowLen * cos(a1),
+                                     y: arrowTip.y + arrowLen * sin(a1)))
+        context.move(to: arrowTip)
+        context.addLine(to: CGPoint(x: arrowTip.x + arrowLen * cos(a2),
+                                     y: arrowTip.y + arrowLen * sin(a2)))
+        context.setLineWidth(1.5)
+        context.setLineCap(.butt)
+        context.strokePath()
+
+        // Resize handles — small squares at corners with directional arrows outside
         let handleSize: CGFloat = 7
+        let arrowOffset: CGFloat = 7  // distance outside the corner
         let handles: [(CGPoint, ResizeCorner)] = [
             (CGPoint(x: rect.minX, y: rect.minY), .topLeft),
             (CGPoint(x: rect.maxX, y: rect.minY), .topRight),
             (CGPoint(x: rect.minX, y: rect.maxY), .bottomLeft),
             (CGPoint(x: rect.maxX, y: rect.maxY), .bottomRight),
         ]
-        for (pt, _) in handles {
+        for (pt, corner) in handles {
             let handleRect = CGRect(x: pt.x - handleSize/2, y: pt.y - handleSize/2,
                                     width: handleSize, height: handleSize)
             context.setFillColor(NSColor.white.cgColor)
@@ -285,6 +314,41 @@ final class CanvasNSView: NSView {
             context.setStrokeColor(NSColor.systemBlue.cgColor)
             context.setLineWidth(1.5)
             context.stroke(handleRect)
+
+            // Directional resize arrows — larger and placed outside the corner
+            let dx: CGFloat = 5
+            let dy: CGFloat = 5
+            let arrows: [(CGPoint, CGPoint)]
+            switch corner {
+            case .topLeft:
+                let base = CGPoint(x: pt.x - arrowOffset, y: pt.y - arrowOffset)
+                arrows = [(CGPoint(x: base.x + dx, y: base.y + dy), CGPoint(x: base.x - dx, y: base.y - dy)),
+                          (CGPoint(x: base.x - dx, y: base.y - dy), CGPoint(x: base.x - dx*0.3, y: base.y - dy*1.5)),
+                          (CGPoint(x: base.x - dx, y: base.y - dy), CGPoint(x: base.x - dx*1.5, y: base.y - dy*0.3))]
+            case .topRight:
+                let base = CGPoint(x: pt.x + arrowOffset, y: pt.y - arrowOffset)
+                arrows = [(CGPoint(x: base.x - dx, y: base.y + dy), CGPoint(x: base.x + dx, y: base.y - dy)),
+                          (CGPoint(x: base.x + dx, y: base.y - dy), CGPoint(x: base.x + dx*0.3, y: base.y - dy*1.5)),
+                          (CGPoint(x: base.x + dx, y: base.y - dy), CGPoint(x: base.x + dx*1.5, y: base.y - dy*0.3))]
+            case .bottomLeft:
+                let base = CGPoint(x: pt.x - arrowOffset, y: pt.y + arrowOffset)
+                arrows = [(CGPoint(x: base.x + dx, y: base.y - dy), CGPoint(x: base.x - dx, y: base.y + dy)),
+                          (CGPoint(x: base.x - dx, y: base.y + dy), CGPoint(x: base.x - dx*0.3, y: base.y + dy*1.5)),
+                          (CGPoint(x: base.x - dx, y: base.y + dy), CGPoint(x: base.x - dx*1.5, y: base.y + dy*0.3))]
+            case .bottomRight:
+                let base = CGPoint(x: pt.x + arrowOffset, y: pt.y + arrowOffset)
+                arrows = [(CGPoint(x: base.x - dx, y: base.y - dy), CGPoint(x: base.x + dx, y: base.y + dy)),
+                          (CGPoint(x: base.x + dx, y: base.y + dy), CGPoint(x: base.x + dx*0.3, y: base.y + dy*1.5)),
+                          (CGPoint(x: base.x + dx, y: base.y + dy), CGPoint(x: base.x + dx*1.5, y: base.y + dy*0.3))]
+            }
+            context.setStrokeColor(NSColor.systemBlue.cgColor)
+            context.setLineWidth(1.2)
+            context.setLineCap(.round)
+            for (from, to) in arrows {
+                context.move(to: from)
+                context.addLine(to: to)
+            }
+            context.strokePath()
         }
     }
 
