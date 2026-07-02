@@ -23,6 +23,7 @@ final class AppSettings: ObservableObject {
         static let defaultBackgroundGreen = "defaultBackgroundGreen"
         static let defaultBackgroundBlue = "defaultBackgroundBlue"
         static let defaultBorderMargin = "defaultBorderMargin"
+        static let defaultPhotoScalePercent = "defaultPhotoScalePercent"
     }
 
     // MARK: - Defaults
@@ -135,6 +136,13 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// Default photo scale as percentage of canvas size for new layers (default: 30).
+    @Published var defaultPhotoScalePercent: CGFloat {
+        didSet {
+            defaults.set(defaultPhotoScalePercent, forKey: Keys.defaultPhotoScalePercent)
+        }
+    }
+
     // MARK: - Init
 
     private init() {
@@ -237,6 +245,10 @@ final class AppSettings: ObservableObject {
         // Load default border margin (default: 40)
         let savedMargin = defaults.double(forKey: Keys.defaultBorderMargin)
         self.defaultBorderMargin = savedMargin > 0 ? savedMargin : 40
+
+        // Load default photo scale percent (default: 30)
+        let savedScale = defaults.double(forKey: Keys.defaultPhotoScalePercent)
+        self.defaultPhotoScalePercent = savedScale > 0 ? savedScale : 30
 
         // Ensure subdirectories exist (safe to call after all properties initialized)
         prepareDirectories()

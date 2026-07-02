@@ -47,19 +47,26 @@ Collage Canvas Config feature:
 Collage Canvas image feature:
 
     Single images can be selected and dragged to the canvas for a collage.  When dropped they appear at the place they are dropped and are scaled visually to be approx 30% the size of the canvas.  This % can be set in global config.
+
     To start each image in a collage has a depth starting at 0 (the back) and incrementing.   When a new image is added it is added on top so has the next incremented depth value.
+
     Multiple images can be selected and dragged to the canvas for a collage.  Here the images are overlapped (down and to the right) and are all placed on top of each other when dropped (still stacked)
     Individual images can be selected and moved around the canvas.   For a defined bounding box the box changes size as images are moved. 
     When images overlap their depth is used to determine which parts are visible.
+
     The canvas can be zoomed in our out which should have a good UX (pinch, rollers, sliders  etc)
+
     There is a tool on canvas toolbar that shows the canvas sized to the bounding box, ie what will be exported.
+
     Any change to the canvas is saved to the underlying JSON file
 
 
 Collage Canvas layering feature:
 
     When an image is selected it should be possible to change the layering with respect to another image.  So if the other image is below the current one then the current  one is placed just below the target one, or if it is already below then it is placed above the target image..   This needs to then adjust the depth on all images to reflect this change.  The UX on this is important to get right.
+
     It should be possible to rotate a selected image easily using a handle and mouse - rotation should be smooth and the image clearly display at its depth correctly and in relation to overlapping images.  The UX on this is important to get right.
+
     It should be possible to resize a selected image easily using a handle and mouse - rotation should be smooth and the image clearly display at its depth correctly and in relation to overlapping images.  The UX on this is important to get right but this feature is less important. that the rotation feature.
 
 
@@ -77,8 +84,10 @@ Collage Export feature:
 
 Future:
 
-    Shadows
-    Complex layering
-    Collage from collecion inherits its name by default.
-    Consider using hashes for file integrity with detection and repair functionality.
+    * Shadows
+    * Complex layering
+    * Collage from collecion inherits its name by default.
+    * Consider using hashes for file integrity with detection and repair functionality.
+    * Logo
+    * Name in italicas and <Blank canvas>
 

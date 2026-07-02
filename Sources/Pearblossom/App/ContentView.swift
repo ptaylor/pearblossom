@@ -21,6 +21,19 @@ struct ContentView: View {
             InspectorView(project: $currentProject)
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 350)
                 .frame(minWidth: 220)
-        }
+        }        .onChange(of: currentProject?.name) { _, _ in updateWindowTitle() }
+        .onChange(of: currentProject?.description) { _, _ in updateWindowTitle() }
+        .onAppear { updateWindowTitle() }
     }
+
+    private func updateWindowTitle() {
+        if let proj = currentProject {
+            var title = "Pearblossom — \(proj.name)"
+            if !proj.description.isEmpty {
+                title += " — \(proj.description)"
+            }
+            NSApp.mainWindow?.title = title
+        } else {
+            NSApp.mainWindow?.title = "Pearblossom"
+        }    }
 }

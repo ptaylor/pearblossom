@@ -149,6 +149,19 @@ private struct GeneralSettingsTab: View {
                     .frame(width: 40, alignment: .trailing)
             }
 
+            HStack {
+                Text("Default photo scale:")
+                    .font(.body)
+
+                Slider(value: $settings.defaultPhotoScalePercent, in: 10...50, step: 5)
+
+                Text("\(Int(settings.defaultPhotoScalePercent))%")
+                    .font(.body)
+                    .monospacedDigit()
+                    .foregroundColor(.secondary)
+                    .frame(width: 40, alignment: .trailing)
+            }
+
             Text("Applied to new collages. Existing collages are unaffected.")
                 .font(.caption)
                 .foregroundColor(.secondary)

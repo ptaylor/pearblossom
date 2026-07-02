@@ -155,7 +155,11 @@ struct CollagesListView: View {
         .alert("Delete Collage", isPresented: $showDeleteAlert, presenting: collageToDelete) { collage in
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {
-                deleteCollage(collage)
+                // Defer to next run loop so the alert sheet finishes dismissing
+                // before we modify state (prevents SwiftUI hang/crash).
+                DispatchQueue.main.async {
+                    deleteCollage(collage)
+                }
             }
         } message: { collage in
             Text("\"\(collage.name)\" will be permanently deleted. This cannot be undone.")

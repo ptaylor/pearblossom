@@ -195,7 +195,11 @@ struct CollectionsListView: View {
         .alert("Delete Collection", isPresented: $showDeleteAlert, presenting: collectionToDelete) { collection in
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive) {
-                deleteCollection(collection)
+                // Defer to next run loop so the alert sheet finishes dismissing
+                // before we modify state (prevents SwiftUI hang/crash).
+                DispatchQueue.main.async {
+                    deleteCollection(collection)
+                }
             }
         } message: { collection in
             if collection.importMode == .copy {
@@ -780,6 +784,18 @@ private struct ThumbnailCell: View {
                     onShiftTap()
                 }
         )
+        .onDrag {
+            let path = photo.resolvedPath(relativeTo: folderPath)
+            let provider = NSItemProvider(object: path as NSString)
+            return provider
+        } preview: {
+            // Show a scaled-down preview during drag
+            PhotoThumbnailView(sourcePath: photo.resolvedPath(relativeTo: folderPath),
+                               thumbnailPath: photo.resolvedThumbnailPath(relativeTo: folderPath))
+                .frame(width: 80, height: 80)
+                .cornerRadius(4)
+                .opacity(0.8)
+        }
     }
 }
 
@@ -852,4 +868,5 @@ private struct CollectionRow: View {
 
 extension Notification.Name {
     static let triggerImport = Notification.Name("PearblossomTriggerImport")
+    static let fitToBoundingBox = Notification.Name("PearblossomFitToBoundingBox")
 }

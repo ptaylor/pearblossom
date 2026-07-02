@@ -117,6 +117,14 @@ struct InspectorView: View {
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
+
+            Button {
+                NotificationCenter.default.post(name: .fitToBoundingBox, object: nil)
+            } label: {
+                Label("Fit to Bounding Box", systemImage: "arrow.up.left.and.down.right.magnifyingglass")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
         }
     }
 

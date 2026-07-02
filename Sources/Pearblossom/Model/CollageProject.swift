@@ -114,6 +114,14 @@ struct PhotoLayer: Codable, Identifiable {
         case id, photoPath, position, size, rotation, zOrder, opacity
         case sourceResolution, cropRect, featherRadius, blendMode
     }
+
+    /// Resolves the photo path to an absolute path. Relative paths are resolved
+    /// against the Pearblossom root directory.
+    func resolvedPhotoPath() -> String {
+        if photoPath.hasPrefix("/") { return photoPath }
+        let root = AppSettings.shared.collectionsRoot.path
+        return (root as NSString).appendingPathComponent(photoPath)
+    }
 }
 
 /// A Codable wrapper for CGColor, used for the canvas background.
