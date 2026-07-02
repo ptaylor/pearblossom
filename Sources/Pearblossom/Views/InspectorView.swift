@@ -121,11 +121,17 @@ struct InspectorView: View {
             Button {
                 NotificationCenter.default.post(name: .fitToBoundingBox, object: nil)
             } label: {
-                Label("Fit Content", systemImage: "arrow.up.left.and.down.right.magnifyingglass")
+                if binding.wrappedValue.showBoundingBox {
+                    Label("Fit Content", systemImage: "arrow.up.left.and.down.right.magnifyingglass")
+                } else {
+                    Label("Show All", systemImage: "arrow.down.backward.and.arrow.up.forward")
+                }
             }
             .buttonStyle(.bordered)
             .controlSize(.small)
-            .help("Zoom to the content area and hide the bounding box guide")
+            .help(binding.wrappedValue.showBoundingBox
+                  ? "Zoom to the content area for export preview"
+                  : "Reset zoom and return to normal view")
 
             Toggle("Show Bounding Box", isOn: binding.showBoundingBox)
                 .font(.body)

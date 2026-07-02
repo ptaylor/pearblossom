@@ -73,6 +73,16 @@ struct CanvasView: NSViewRepresentable {
         @objc private func fitToBoundingBox() {
             guard let scrollView = scrollView,
                   var proj = projectBinding.wrappedValue else { return }
+
+            if !proj.showBoundingBox {
+                // Already in fit mode — exit: reset zoom and show bounding box
+                scrollView.animator().magnification = 1.0
+                proj.showBoundingBox = true
+                projectBinding.wrappedValue = proj
+                Logger.debug("fitToBoundingBox: exit fit mode, reset zoom to 1.0")
+                return
+            }
+
             let bb = proj.effectiveBoundingBox()
             let viewSize = scrollView.contentSize
             guard bb.width > 0, bb.height > 0, viewSize.width > 0, viewSize.height > 0 else { return }
