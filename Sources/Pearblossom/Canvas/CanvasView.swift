@@ -72,14 +72,30 @@ struct CanvasView: NSViewRepresentable {
 
         @objc private func fitToBoundingBox() {
             guard let scrollView = scrollView,
-                  let proj = projectBinding.wrappedValue else { return }
+                  var proj = projectBinding.wrappedValue else { return }
             let bb = proj.effectiveBoundingBox()
             let viewSize = scrollView.contentSize
             guard bb.width > 0, bb.height > 0, viewSize.width > 0, viewSize.height > 0 else { return }
-            let scaleX = viewSize.width / bb.width
-            let scaleY = viewSize.height / bb.height
-            scrollView.animator().magnification = min(scaleX, scaleY) * 0.9
-            scrollView.animator().contentView.scroll(to: NSPoint(x: bb.origin.x - 20, y: bb.origin.y - 20))
+
+            // Fit bounding box with 10% margin so the content doesn't touch the edges.
+            let margin: CGFloat = 0.10
+            let usableWidth = viewSize.width * (1 - margin * 2)
+            let usableHeight = viewSize.height * (1 - margin * 2)
+            let mag = min(usableWidth / bb.width, usableHeight / bb.height)
+
+            // Apply magnification, then read the resulting visible rect to compute scroll
+            scrollView.magnification = mag
+            scrollView.layout()  // let the scroll view settle the new magnification
+
+            let visibleRect = scrollView.contentView.documentVisibleRect
+            let scrollX = bb.midX - visibleRect.width / 2
+            let scrollY = bb.midY - visibleRect.height / 2
+            scrollView.contentView.scroll(to: NSPoint(x: scrollX, y: scrollY))
+
+            // Hide the bounding box guide when zoomed to content — this is the export preview
+            proj.showBoundingBox = false
+            projectBinding.wrappedValue = proj
+            Logger.debug("fitToBoundingBox: bb=\(bb) viewSize=\(viewSize) mag=\(mag) visibleRect=\(visibleRect) scrollTo=(\(scrollX), \(scrollY))")
         }
 
         func handleDrop(paths: [String], at point: CGPoint, canvas: CanvasNSView) {

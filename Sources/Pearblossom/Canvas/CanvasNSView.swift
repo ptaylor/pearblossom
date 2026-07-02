@@ -52,17 +52,37 @@ final class CanvasNSView: NSView {
         super.draw(dirtyRect)
         guard let cgContext = NSGraphicsContext.current?.cgContext else { return }
 
-        cgContext.setFillColor(currentBackground)
-        cgContext.fill(bounds)
-
         if let proj = project, !proj.layers.isEmpty {
-            renderLayers(proj, in: cgContext)
-        } else {
-            drawPlaceholder(in: cgContext)
-        }
+            if proj.showBoundingBox {
+                // Normal mode: entire canvas uses the background color
+                cgContext.setFillColor(currentBackground)
+                cgContext.fill(bounds)
+            } else {
+                // Fit Content / preview mode: margins show complementary greyscale,
+                // bounding box area shows the actual background.
+                let bb = proj.effectiveBoundingBox()
+                cgContext.setFillColor(currentBackground.complementaryGreyscale)
+                cgContext.fill(bounds)
+                cgContext.setFillColor(currentBackground)
+                cgContext.fill(bb)
+            }
 
-        if let proj = project, proj.showBoundingBox {
-            drawBoundingBox(proj.effectiveBoundingBox(), on: currentBackground, in: cgContext)
+            renderLayers(proj, in: cgContext)
+
+            if proj.showBoundingBox {
+                drawBoundingBox(proj.effectiveBoundingBox(), on: currentBackground, in: cgContext)
+            }
+        } else if let proj = project {
+            // No layers: fill entire canvas with background
+            cgContext.setFillColor(currentBackground)
+            cgContext.fill(bounds)
+            if proj.showBoundingBox {
+                drawBoundingBox(proj.effectiveBoundingBox(), on: currentBackground, in: cgContext)
+            }
+        } else {
+            cgContext.setFillColor(currentBackground)
+            cgContext.fill(bounds)
+            drawPlaceholder(in: cgContext)
         }
 
         if let proj = project {
@@ -322,4 +342,26 @@ final class CanvasNSView: NSView {
 
     override var isFlipped: Bool { true }
     override func layout() { super.layout(); layer?.frame = bounds }
+}
+
+// MARK: - CGColor Complementary Greyscale
+
+private extension CGColor {
+    /// Returns the complementary greyscale: inverts the luminance.
+    /// White → black, black → white, 40% grey → 60% grey, etc.
+    var complementaryGreyscale: CGColor {
+        guard let comps = components, comps.count >= 3 else { return self }
+        let r = comps[0]
+        // Invert the grey: 1.0 - grey, then clamp to a visible range
+        // so 50% grey doesn't map to itself (invisible).
+        let inv = 1.0 - r
+        // Push mid-greys away from center so there's always contrast
+        let adjusted: CGFloat
+        if inv > 0.45 && inv < 0.55 {
+            adjusted = inv >= 0.5 ? 0.7 : 0.3
+        } else {
+            adjusted = inv
+        }
+        return CGColor(red: adjusted, green: adjusted, blue: adjusted, alpha: 1.0)
+    }
 }
