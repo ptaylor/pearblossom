@@ -30,6 +30,27 @@ final class CanvasNSView: NSView {
     private var selectedLayerIDs = Set<UUID>()
     private var dragOffset: CGPoint = .zero
 
+    // MARK: - Interaction State
+
+    private enum InteractionMode {
+        case none
+        case moving
+        case rotating
+        case resizing(corner: ResizeCorner)
+    }
+
+    private enum ResizeCorner {
+        case topLeft, topRight, bottomLeft, bottomRight
+    }
+
+    private var interactionMode: InteractionMode = .none
+    private var rotationStartAngle: CGFloat = 0      // initial mouse angle when rotation began
+    private var rotationStartLayerAngle: CGFloat = 0  // initial layer rotation when rotation began
+    private var resizeStartSize: CGSize = .zero       // initial layer size when resize began
+    private var resizeStartPosition: CGPoint = .zero  // initial layer position when resize began
+    private var resizeOppositeCorner: CGPoint = .zero // anchor corner (doesn't move)
+    private var resizeAspectRatio: CGFloat = 1.0      // width/height of layer at resize start
+
     private var currentBackground: CGColor {
         project?.backgroundColor.cgColor ?? .white
     }
@@ -225,6 +246,46 @@ final class CanvasNSView: NSView {
         context.setLineDash(phase: 0, lengths: [4, 2])
         context.stroke(rect)
         context.setLineDash(phase: 0, lengths: [])
+
+        // Only show handles when exactly one layer is selected
+        guard selectedLayerIDs.count == 1, let proj = project,
+              proj.layers.first(where: { $0.id == layer.id }) != nil else { return }
+
+        // Rotation knob — small circle above top-center
+        let knobRadius: CGFloat = 5
+        let knobCenter = CGPoint(x: layer.position.x, y: rect.minY - 12)
+        let knobRect = CGRect(x: knobCenter.x - knobRadius, y: knobCenter.y - knobRadius,
+                              width: knobRadius * 2, height: knobRadius * 2)
+        context.setFillColor(NSColor.systemBlue.cgColor)
+        context.fillEllipse(in: knobRect)
+        context.setStrokeColor(NSColor.white.cgColor)
+        context.setLineWidth(1)
+        context.strokeEllipse(in: knobRect)
+
+        // Line connecting knob to selection border
+        context.setStrokeColor(NSColor.systemBlue.withAlphaComponent(0.6).cgColor)
+        context.setLineWidth(1)
+        context.move(to: CGPoint(x: layer.position.x, y: rect.minY))
+        context.addLine(to: knobCenter)
+        context.strokePath()
+
+        // Resize handles — four small squares at corners
+        let handleSize: CGFloat = 7
+        let handles: [(CGPoint, ResizeCorner)] = [
+            (CGPoint(x: rect.minX, y: rect.minY), .topLeft),
+            (CGPoint(x: rect.maxX, y: rect.minY), .topRight),
+            (CGPoint(x: rect.minX, y: rect.maxY), .bottomLeft),
+            (CGPoint(x: rect.maxX, y: rect.maxY), .bottomRight),
+        ]
+        for (pt, _) in handles {
+            let handleRect = CGRect(x: pt.x - handleSize/2, y: pt.y - handleSize/2,
+                                    width: handleSize, height: handleSize)
+            context.setFillColor(NSColor.white.cgColor)
+            context.fill(handleRect)
+            context.setStrokeColor(NSColor.systemBlue.cgColor)
+            context.setLineWidth(1.5)
+            context.stroke(handleRect)
+        }
     }
 
     private func drawBoundingBox(_ rect: CGRect, on background: CGColor, in context: CGContext) {
@@ -263,47 +324,175 @@ final class CanvasNSView: NSView {
         return nil
     }
 
+    /// Returns the layer if the point hits its rotation knob.
+    private func rotationKnobHit(at point: CGPoint) -> PhotoLayer? {
+        guard selectedLayerIDs.count == 1,
+              let id = selectedLayerIDs.first,
+              let layer = project?.layers.first(where: { $0.id == id }) else { return nil }
+        let knobCenter = CGPoint(x: layer.position.x, y: layer.position.y - layer.size.height / 2 - 12)
+        let hitRadius: CGFloat = 10
+        let dx = point.x - knobCenter.x
+        let dy = point.y - knobCenter.y
+        return (dx*dx + dy*dy) <= (hitRadius * hitRadius) ? layer : nil
+    }
+
+    /// Returns the resize corner if the point hits a handle of the selected layer.
+    private func resizeHandleHit(at point: CGPoint) -> (PhotoLayer, ResizeCorner)? {
+        guard selectedLayerIDs.count == 1,
+              let id = selectedLayerIDs.first,
+              let layer = project?.layers.first(where: { $0.id == id }) else { return nil }
+        let rect = CGRect(x: layer.position.x - layer.size.width / 2,
+                          y: layer.position.y - layer.size.height / 2,
+                          width: layer.size.width, height: layer.size.height)
+        let handleSize: CGFloat = 7
+        let halfH = handleSize / 2 + 3  // generous hit zone
+        let corners: [(CGPoint, ResizeCorner)] = [
+            (CGPoint(x: rect.minX, y: rect.minY), .topLeft),
+            (CGPoint(x: rect.maxX, y: rect.minY), .topRight),
+            (CGPoint(x: rect.minX, y: rect.maxY), .bottomLeft),
+            (CGPoint(x: rect.maxX, y: rect.maxY), .bottomRight),
+        ]
+        for (pt, corner) in corners {
+            let hitRect = CGRect(x: pt.x - halfH, y: pt.y - halfH,
+                                 width: halfH*2, height: halfH*2)
+            if hitRect.contains(point) { return (layer, corner) }
+        }
+        return nil
+    }
+
     // MARK: - Mouse Events
 
     override func mouseDown(with event: NSEvent) {
         isDragging = true
         let point = convert(event.locationInWindow, from: nil)
+
+        // 1. Cmd+click on another layer = reorder
+        if event.modifierFlags.contains(.command),
+           let clickedLayer = layerAt(point: point),
+           let selectedID = selectedLayerIDs.first,
+           selectedID != clickedLayer.id,
+           var proj = project {
+            proj.reorder(layerID: selectedID, relativeTo: clickedLayer.id)
+            project = proj
+            cachedComposite = nil
+            needsDisplay = true
+            onLayersChanged?()
+            interactionMode = .none
+            Logger.debug("mouseDown: Cmd+click reorder layer \(selectedID) relative to \(clickedLayer.id)")
+            return
+        }
+
+        // 2. Rotation knob hit
+        if let layer = rotationKnobHit(at: point) {
+            interactionMode = .rotating
+            rotationStartLayerAngle = layer.rotation
+            let center = layer.position
+            rotationStartAngle = atan2(point.y - center.y, point.x - center.x)
+            Logger.debug("mouseDown: rotation start, layer angle=\(layer.rotation)")
+            return
+        }
+
+        // 3. Resize handle hit
+        if let (layer, corner) = resizeHandleHit(at: point) {
+            interactionMode = .resizing(corner: corner)
+            resizeStartSize = layer.size
+            resizeStartPosition = layer.position
+            resizeAspectRatio = layer.size.width / max(layer.size.height, 1)
+            // Compute the opposite (anchor) corner
+            let rect = CGRect(x: layer.position.x - layer.size.width / 2,
+                              y: layer.position.y - layer.size.height / 2,
+                              width: layer.size.width, height: layer.size.height)
+            switch corner {
+            case .topLeft:     resizeOppositeCorner = CGPoint(x: rect.maxX, y: rect.maxY)
+            case .topRight:    resizeOppositeCorner = CGPoint(x: rect.minX, y: rect.maxY)
+            case .bottomLeft:  resizeOppositeCorner = CGPoint(x: rect.maxX, y: rect.minY)
+            case .bottomRight: resizeOppositeCorner = CGPoint(x: rect.minX, y: rect.minY)
+            }
+            Logger.debug("mouseDown: resize start, corner=\(corner), anchor=\(resizeOppositeCorner)")
+            return
+        }
+
+        // 4. Layer selection / move
         if let layer = layerAt(point: point) {
             if event.modifierFlags.contains(.shift) {
                 if selectedLayerIDs.contains(layer.id) { selectedLayerIDs.remove(layer.id) }
                 else { selectedLayerIDs.insert(layer.id) }
-            } else { selectedLayerIDs = [layer.id] }
+            } else {
+                selectedLayerIDs = [layer.id]
+            }
             dragOffset = CGPoint(x: point.x - layer.position.x, y: point.y - layer.position.y)
+            interactionMode = .moving
             needsDisplay = true
         } else {
             selectedLayerIDs = []
+            interactionMode = .none
             needsDisplay = true
         }
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard !selectedLayerIDs.isEmpty, var proj = project else { return }
         let point = convert(event.locationInWindow, from: nil)
-        for id in selectedLayerIDs {
-            if let index = proj.layers.firstIndex(where: { $0.id == id }) {
-                proj.layers[index].position = CGPoint(x: point.x - dragOffset.x, y: point.y - dragOffset.y)
+
+        switch interactionMode {
+        case .rotating:
+            guard let id = selectedLayerIDs.first,
+                  var proj = project,
+                  let index = proj.layers.firstIndex(where: { $0.id == id }) else { return }
+            let center = proj.layers[index].position
+            let newAngle = atan2(point.y - center.y, point.x - center.x)
+            proj.layers[index].rotation = rotationStartLayerAngle + (newAngle - rotationStartAngle)
+            project = proj
+            needsDisplay = true
+
+        case .resizing:
+            guard let id = selectedLayerIDs.first,
+                  var proj = project,
+                  let index = proj.layers.firstIndex(where: { $0.id == id }) else { return }
+            let anchor = resizeOppositeCorner
+
+            // Compute new size: distance from anchor corner to mouse is the new dimension
+            let newW = abs(point.x - anchor.x)
+            let newH = newW / resizeAspectRatio
+            let newSize = CGSize(width: max(newW, 20), height: max(newH, 20))
+
+            // New position: midpoint between anchor and the dragged corner
+            let newCenter = CGPoint(x: (anchor.x + point.x) / 2,
+                                    y: (anchor.y + point.y) / 2)
+
+            proj.layers[index].size = newSize
+            proj.layers[index].position = newCenter
+            project = proj
+            needsDisplay = true
+
+        case .moving:
+            guard !selectedLayerIDs.isEmpty, var proj = project else { return }
+            for id in selectedLayerIDs {
+                if let index = proj.layers.firstIndex(where: { $0.id == id }) {
+                    proj.layers[index].position = CGPoint(x: point.x - dragOffset.x, y: point.y - dragOffset.y)
+                }
             }
+            project = proj
+            needsDisplay = true
+
+        case .none:
+            break
         }
-        project = proj
-        needsDisplay = true
     }
 
     override func mouseUp(with event: NSEvent) {
         isDragging = false
         cachedComposite = nil  // Rebuild clean composite on next draw
+
         if let proj = project {
             for id in selectedLayerIDs {
                 if let layer = proj.layers.first(where: { $0.id == id }) {
-                    Logger.debug("mouseUp: layer id=\(id) finalPosition=\(layer.position) size=\(layer.size) rotation=\(layer.rotation)")
+                    Logger.debug("mouseUp: layer id=\(id) position=\(layer.position) size=\(layer.size) rotation=\(layer.rotation)")
                 }
             }
         }
+
         needsDisplay = true
+        interactionMode = .none
         onLayersChanged?()
     }
 
@@ -316,6 +505,80 @@ final class CanvasNSView: NSView {
             needsDisplay = true
             onLayersChanged?()
         } else { super.keyDown(with: event) }
+    }
+
+    // MARK: - Context Menu
+
+    override func rightMouseDown(with event: NSEvent) {
+        let point = convert(event.locationInWindow, from: nil)
+
+        // Select the layer under the cursor if not already selected
+        if let clickedLayer = layerAt(point: point) {
+            if !selectedLayerIDs.contains(clickedLayer.id) {
+                selectedLayerIDs = [clickedLayer.id]
+                needsDisplay = true
+            }
+        }
+
+        // Show context menu if a layer is selected
+        guard selectedLayerIDs.count == 1,
+              let id = selectedLayerIDs.first,
+              let proj = project else {
+            super.rightMouseDown(with: event)
+            return
+        }
+
+        let menu = NSMenu()
+
+        let bringFront = NSMenuItem(title: "Bring to Front", action: #selector(handleContextMenu(_:)), keyEquivalent: "")
+        bringFront.representedObject = id
+        bringFront.tag = 1
+        menu.addItem(bringFront)
+
+        let sendBack = NSMenuItem(title: "Send to Back", action: #selector(handleContextMenu(_:)), keyEquivalent: "")
+        sendBack.representedObject = id
+        sendBack.tag = 2
+        menu.addItem(sendBack)
+
+        menu.addItem(.separator())
+
+        let moveUp = NSMenuItem(title: "Move Up", action: #selector(handleContextMenu(_:)), keyEquivalent: "")
+        moveUp.representedObject = id
+        moveUp.tag = 3
+        if let layer = proj.layers.first(where: { $0.id == id }),
+           let maxZ = proj.layers.map(\.zOrder).max(),
+           layer.zOrder >= maxZ {
+            moveUp.isEnabled = false
+        }
+        menu.addItem(moveUp)
+
+        let moveDown = NSMenuItem(title: "Move Down", action: #selector(handleContextMenu(_:)), keyEquivalent: "")
+        moveDown.representedObject = id
+        moveDown.tag = 4
+        if let layer = proj.layers.first(where: { $0.id == id }),
+           let minZ = proj.layers.map(\.zOrder).min(),
+           layer.zOrder <= minZ {
+            moveDown.isEnabled = false
+        }
+        menu.addItem(moveDown)
+
+        NSMenu.popUpContextMenu(menu, with: event, for: self)
+    }
+
+    @objc private func handleContextMenu(_ sender: NSMenuItem) {
+        guard let id = sender.representedObject as? UUID, var proj = project else { return }
+        switch sender.tag {
+        case 1: proj.bringToFront(layerID: id)
+        case 2: proj.sendToBack(layerID: id)
+        case 3: proj.moveUp(layerID: id)
+        case 4: proj.moveDown(layerID: id)
+        default: return
+        }
+        project = proj
+        cachedComposite = nil
+        needsDisplay = true
+        onLayersChanged?()
+        Logger.debug("handleContextMenu: tag=\(sender.tag) layer=\(id)")
     }
 
     // MARK: - Drag & Drop

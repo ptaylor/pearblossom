@@ -46,6 +46,68 @@ struct CollageProject: Codable, Identifiable {
         }
     }
 
+    // MARK: - Layer Reordering
+
+    /// Moves `layerID` relative to `targetID`. Toggle behavior: if the layer is
+    /// currently below the target, it is placed just above it; if above, just below.
+    /// All z-orders are then renumbered to contiguous integers starting at 0.
+    mutating func reorder(layerID: UUID, relativeTo targetID: UUID) {
+        guard let layerIndex = layers.firstIndex(where: { $0.id == layerID }),
+              let targetIndex = layers.firstIndex(where: { $0.id == targetID }),
+              layerIndex != targetIndex else { return }
+
+        let layer = layers.remove(at: layerIndex)
+        let adjustedTarget = layerIndex < targetIndex ? targetIndex - 1 : targetIndex
+        let target = layers[adjustedTarget]
+
+        if layer.zOrder < target.zOrder {
+            layers.insert(layer, at: adjustedTarget + 1)
+        } else {
+            layers.insert(layer, at: adjustedTarget)
+        }
+
+        renumberZOrders()
+        modifiedAt = Date()
+    }
+
+    mutating func bringToFront(layerID: UUID) {
+        guard let index = layers.firstIndex(where: { $0.id == layerID }) else { return }
+        let layer = layers.remove(at: index)
+        layers.append(layer)
+        renumberZOrders()
+        modifiedAt = Date()
+    }
+
+    mutating func sendToBack(layerID: UUID) {
+        guard let index = layers.firstIndex(where: { $0.id == layerID }) else { return }
+        let layer = layers.remove(at: index)
+        layers.insert(layer, at: 0)
+        renumberZOrders()
+        modifiedAt = Date()
+    }
+
+    mutating func moveUp(layerID: UUID) {
+        guard let index = layers.firstIndex(where: { $0.id == layerID }),
+              index + 1 < layers.count else { return }
+        layers.swapAt(index, index + 1)
+        renumberZOrders()
+        modifiedAt = Date()
+    }
+
+    mutating func moveDown(layerID: UUID) {
+        guard let index = layers.firstIndex(where: { $0.id == layerID }),
+              index > 0 else { return }
+        layers.swapAt(index, index - 1)
+        renumberZOrders()
+        modifiedAt = Date()
+    }
+
+    private mutating func renumberZOrders() {
+        for i in layers.indices {
+            layers[i].zOrder = i
+        }
+    }
+
     init(id: UUID = UUID(),
          version: Int = 1,
          name: String,
