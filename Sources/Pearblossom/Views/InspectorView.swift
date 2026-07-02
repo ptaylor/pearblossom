@@ -5,6 +5,7 @@ import SwiftUI
 struct InspectorView: View {
 
     @Binding var project: CollageProject?
+    @Binding var magnification: CGFloat
 
     var body: some View {
         VStack(spacing: 0) {
@@ -16,18 +17,26 @@ struct InspectorView: View {
 
             Divider()
 
-            if let binding = Binding($project) {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    if let binding = Binding($project) {
                         backgroundSection(binding)
                         Divider()
                         boundingBoxSection(binding)
                         Divider()
+                    }
+
+                    zoomSection()
+
+                    if let binding = Binding($project) {
+                        Divider()
                         canvasInfoSection(binding.wrappedValue)
                     }
-                    .padding()
                 }
-            } else {
+                .padding()
+            }
+
+            if project == nil {
                 Spacer()
                 Text("Select a collage to configure")
                     .font(.caption)
@@ -138,6 +147,48 @@ struct InspectorView: View {
                 .onChange(of: binding.wrappedValue.showBoundingBox) { _, _ in
                     binding.wrappedValue.modifiedAt = Date()
                 }
+        }
+    }
+
+    // MARK: - Zoom Section
+
+    private func zoomSection() -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Zoom")
+                .font(.headline)
+
+            HStack(spacing: 4) {
+                Button {
+                    let newMag = max(magnification - 0.25, 0.1)
+                    magnification = newMag
+                } label: {
+                    Image(systemName: "minus.magnifyingglass")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help("Zoom Out (⌘–)")
+
+                Slider(value: $magnification, in: 0.1...5.0, step: 0.05)
+                    .help("Zoom Level")
+
+                Button {
+                    let newMag = min(magnification + 0.25, 5.0)
+                    magnification = newMag
+                } label: {
+                    Image(systemName: "plus.magnifyingglass")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .help("Zoom In (⌘+)")
+            }
+
+            HStack {
+                Spacer()
+                Text("\(Int(magnification * 100))%")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .monospacedDigit()
+            }
         }
     }
 

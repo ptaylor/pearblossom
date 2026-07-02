@@ -90,4 +90,7 @@ Future:
     * Consider using hashes for file integrity with detection and repair functionality.
     * Logo
     * Name in italicas and <Blank canvas>
+    * Auto generaete collage
+    * Caching of intermediate sized images
+    * Crashing deleting collage
 

@@ -1,13 +1,35 @@
 import SwiftUI
 import AppKit
 
+// MARK: - Zoomable Scroll View
+
+/// NSScrollView subclass that supports Cmd+scroll-wheel zoom.
+private class ZoomableScrollView: NSScrollView {
+    var onMagnificationChanged: ((CGFloat) -> Void)?
+
+    override func scrollWheel(with event: NSEvent) {
+        if event.modifierFlags.contains(.command) {
+            let delta = event.scrollingDeltaY
+            // Non-precise scroll wheels (mice) use large deltas; trackpads use smaller,
+            // but we only handle mice here since trackpads use pinch-to-zoom.
+            let newMag = magnification * (1 + delta / 400)
+            let clamped = min(max(newMag, minMagnification), maxMagnification)
+            setMagnification(clamped, centeredAt: convert(event.locationInWindow, from: nil))
+            onMagnificationChanged?(clamped)
+        } else {
+            super.scrollWheel(with: event)
+        }
+    }
+}
+
 /// SwiftUI wrapper for the AppKit canvas view with NSScrollView zoom/pan and drop support.
 struct CanvasView: NSViewRepresentable {
 
     @Binding var project: CollageProject?
+    @Binding var magnification: CGFloat
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(project: $project)
+        Coordinator(project: $project, magnification: $magnification)
     }
 
     func makeNSView(context: Context) -> NSScrollView {
@@ -29,7 +51,7 @@ struct CanvasView: NSViewRepresentable {
             context.coordinator.scheduleAutoSave(canvas: canvas)
         }
 
-        let scrollView = NSScrollView(frame: .zero)
+        let scrollView = ZoomableScrollView(frame: .zero)
         scrollView.documentView = canvas
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
@@ -37,8 +59,15 @@ struct CanvasView: NSViewRepresentable {
         scrollView.minMagnification = 0.1
         scrollView.maxMagnification = 5.0
         scrollView.backgroundColor = NSColor.controlBackgroundColor
+        scrollView.magnification = magnification
+
+        // Sync Cmd+scroll and pinch-to-zoom back to the binding
+        scrollView.onMagnificationChanged = { mag in
+            context.coordinator.magnificationBinding.wrappedValue = mag
+        }
 
         context.coordinator.scrollView = scrollView
+        context.coordinator.registerMagnificationObserver()
 
         return scrollView
     }
@@ -52,21 +81,42 @@ struct CanvasView: NSViewRepresentable {
                 canvas.setFrameSize(newSize)
             }
         }
+        // Sync magnification from binding → scroll view (for slider changes)
+        if abs(scrollView.magnification - magnification) > 0.001 {
+            scrollView.magnification = magnification
+        }
     }
 
     // MARK: - Coordinator
 
     class Coordinator: NSObject {
         var projectBinding: Binding<CollageProject?>
+        var magnificationBinding: Binding<CGFloat>
         weak var scrollView: NSScrollView?
         private var autoSaveWorkItem: DispatchWorkItem?
 
-        init(project: Binding<CollageProject?>) {
+        init(project: Binding<CollageProject?>, magnification: Binding<CGFloat>) {
             self.projectBinding = project
+            self.magnificationBinding = magnification
             super.init()
             NotificationCenter.default.addObserver(
                 self, selector: #selector(fitToBoundingBox),
                 name: .fitToBoundingBox, object: nil
+            )
+        }
+
+        @objc private func magnificationDidChange(_ notification: Notification) {
+            guard let scrollView = notification.object as? NSScrollView else { return }
+            magnificationBinding.wrappedValue = scrollView.magnification
+        }
+
+        func registerMagnificationObserver() {
+            guard let scrollView = scrollView else { return }
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(magnificationDidChange(_:)),
+                name: NSScrollView.didEndLiveMagnifyNotification,
+                object: scrollView
             )
         }
 
@@ -77,6 +127,7 @@ struct CanvasView: NSViewRepresentable {
             if !proj.showBoundingBox {
                 // Already in fit mode — exit: reset zoom and show bounding box
                 scrollView.animator().magnification = 1.0
+                magnificationBinding.wrappedValue = 1.0
                 proj.showBoundingBox = true
                 projectBinding.wrappedValue = proj
                 Logger.debug("fitToBoundingBox: exit fit mode, reset zoom to 1.0")
@@ -95,6 +146,7 @@ struct CanvasView: NSViewRepresentable {
 
             // Apply magnification, then read the resulting visible rect to compute scroll
             scrollView.magnification = mag
+            magnificationBinding.wrappedValue = mag
             scrollView.layout()  // let the scroll view settle the new magnification
 
             let visibleRect = scrollView.contentView.documentVisibleRect

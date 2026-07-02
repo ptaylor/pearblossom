@@ -5,6 +5,7 @@ struct ContentView: View {
 
     @State private var currentProject: CollageProject? = nil
     @State private var selectedSidebarItem: String? = nil
+    @State private var canvasMagnification: CGFloat = 1.0
 
     var body: some View {
         NavigationSplitView {
@@ -14,11 +15,11 @@ struct ContentView: View {
                 .frame(minWidth: 220)
         } content: {
             // Canvas: the collage editing area
-            CanvasView(project: $currentProject)
+            CanvasView(project: $currentProject, magnification: $canvasMagnification)
                 .frame(minWidth: 600)
         } detail: {
             // Inspector: canvas config and properties
-            InspectorView(project: $currentProject)
+            InspectorView(project: $currentProject, magnification: $canvasMagnification)
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 350)
                 .frame(minWidth: 220)
         }        .onChange(of: currentProject?.name) { _, _ in updateWindowTitle() }
