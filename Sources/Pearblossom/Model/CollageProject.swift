@@ -34,11 +34,16 @@ struct CollageProject: Codable, Identifiable {
         case .definedBorder:
             guard !layers.isEmpty else { return canvasRect }
             let unionRect = layers.reduce(into: CGRect?.none) { result, layer in
+                // Account for rotation: the axis-aligned bounding box of a rotated rect
+                let cosA = abs(cos(layer.rotation))
+                let sinA = abs(sin(layer.rotation))
+                let boundingW = layer.size.width * cosA + layer.size.height * sinA
+                let boundingH = layer.size.width * sinA + layer.size.height * cosA
                 let layerRect = CGRect(
-                    x: layer.position.x - layer.size.width / 2,
-                    y: layer.position.y - layer.size.height / 2,
-                    width: layer.size.width,
-                    height: layer.size.height
+                    x: layer.position.x - boundingW / 2,
+                    y: layer.position.y - boundingH / 2,
+                    width: boundingW,
+                    height: boundingH
                 )
                 result = result?.union(layerRect) ?? layerRect
             } ?? canvasRect
