@@ -7,6 +7,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+
+        // Set app icon from bundled Resources
+        if let iconURL = Bundle.module.url(forResource: "AppIcon", withExtension: "icns"),
+           let iconImage = NSImage(contentsOf: iconURL) {
+            NSApp.applicationIconImage = iconImage
+        }
+
         Logger.debug("App launched — debug logging: \(AppSettings.shared.debugLoggingEnabled), collections root: \(AppSettings.shared.collectionsRoot.path)")
     }
 

@@ -91,17 +91,12 @@ Future:
     * Collage from collecion inherits its name by default.
     * Consider using hashes for file integrity with detection and repair functionality.
     * Logo
-    * Name in italicas and <Blank canvas>
     * Auto generaete collage
     * Caching of intermediate sized images
     * Crashing deleting collage
-    * highlight collection / collage in left panel
     
-    * REDUCE logging
-    * Remove "view " from panel
+    * Enhanced scaling export - slider + see resulting size
+    * EXIF data
     
 
-    BUGS   
-    * resizing from sided does not work
-    * left / right arrows for relaying ?
 
