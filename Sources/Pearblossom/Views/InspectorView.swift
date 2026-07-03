@@ -241,4 +241,8 @@ struct InspectorView: View {
 extension Notification.Name {
     /// Posted to open the Export sheet (from the menu bar).
     static let triggerExport = Notification.Name("PearblossomTriggerExport")
+    /// Posted when photos are dropped on a blank canvas. UserInfo: paths, point, name, description.
+    static let blankCanvasDrop = Notification.Name("PearblossomBlankCanvasDrop")
+    /// Posted to re-trigger a photo drop after a new collage has been created.
+    static let deferredDrop = Notification.Name("PearblossomDeferredDrop")
 }

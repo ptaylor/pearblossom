@@ -87,6 +87,7 @@ Collage Export feature:
 Future:
 
     * Shadows
+    * Logo - shape of a tree different colours.
     * Complex layering
     * Collage from collecion inherits its name by default.
     * Consider using hashes for file integrity with detection and repair functionality.
@@ -97,6 +98,10 @@ Future:
     
     * Enhanced scaling export - slider + see resulting size
     * EXIF data
+    * Images in Collage use collecion and id instead of path
+    * Hanging issues
+    * Performance
+    
     
 
 

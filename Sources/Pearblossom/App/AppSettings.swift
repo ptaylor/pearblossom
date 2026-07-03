@@ -167,6 +167,12 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// The name of the currently expanded collection (for pre-filling new collage dialogs).
+    @Published var activeCollectionName: String?
+
+    /// The description of the currently expanded collection.
+    @Published var activeCollectionDescription: String?
+
     // MARK: - Init
 
     private init() {

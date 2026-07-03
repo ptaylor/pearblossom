@@ -194,7 +194,7 @@ struct CollagesListView: View {
     // MARK: - Collage List
 
     private var collageList: some View {
-        List(selection: $selectedCollageID) {
+        List {
             ForEach(sortedCollages) { collage in
                 CollageRow(
                     collage: collage,
@@ -214,12 +214,16 @@ struct CollagesListView: View {
                         : Color.clear
                 )
                 .onTapGesture {
-                    selectedCollageID = collage.id
-                    selectedProject = collage
-                    Logger.debug("Selected collage '\(collage.name)'")
+                    if selectedCollageID == collage.id {
+                        selectedCollageID = nil
+                        selectedProject = nil
+                    } else {
+                        selectedCollageID = collage.id
+                        selectedProject = collage
+                        Logger.debug("Selected collage '\(collage.name)'")
+                    }
                 }
                 .padding(.vertical, 2)
-                .tag(collage.id)
                 .contextMenu {
                     Button("Edit…") {
                         collageToRename = collage

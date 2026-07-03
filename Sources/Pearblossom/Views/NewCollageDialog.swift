@@ -5,12 +5,18 @@ struct NewCollageDialog: View {
 
     @ObservedObject private var settings = AppSettings.shared
 
-    @State private var name: String = ""
-    @State private var description: String = ""
+    @State private var name: String
+    @State private var description: String
     @State private var nameError: String? = nil
 
     var onCreated: ((CollageProject) -> Void)?
     @Environment(\.dismiss) private var dismiss
+
+    init(initialName: String = "", initialDescription: String = "", onCreated: ((CollageProject) -> Void)? = nil) {
+        _name = State(initialValue: initialName)
+        _description = State(initialValue: initialDescription)
+        self.onCreated = onCreated
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {

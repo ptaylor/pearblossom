@@ -267,9 +267,13 @@ struct CollectionsListView: View {
                     withAnimation(.easeInOut(duration: 0.15)) {
                         if expandedCollectionID == collection.id {
                             expandedCollectionID = nil
+                            settings.activeCollectionName = nil
+                            settings.activeCollectionDescription = nil
                             Logger.debug("Collapsed collection '\(collection.name)'")
                         } else {
                             expandedCollectionID = collection.id
+                            settings.activeCollectionName = collection.name
+                            settings.activeCollectionDescription = collection.description
                             Logger.debug("Expanded collection '\(collection.name)' — \(collection.photos.count) photo(s)")
                             generateMissingThumbnails(for: collection)
                         }
@@ -903,8 +907,6 @@ private struct ThumbnailCell: View {
                 }
         )
         .onDrag {
-            // If multiple photos are selected, drag all of them.
-            // Use newline-separated paths so the canvas can parse them.
             let selectedPhotos: [CollectionPhoto]
             if selectedPhotoIDs.count > 1 && selectedPhotoIDs.contains(photo.id) {
                 selectedPhotos = collection.photos.filter { selectedPhotoIDs.contains($0.id) }

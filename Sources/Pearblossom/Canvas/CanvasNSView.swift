@@ -804,18 +804,25 @@ final class CanvasNSView: NSView {
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         let pasteboard = sender.draggingPasteboard
         var paths: [String] = []
+
+        // Try file URLs (Finder drag)
         if let urls = pasteboard.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] {
             paths = urls.map { $0.path }
         }
-        if paths.isEmpty, let strings = pasteboard.readObjects(forClasses: [NSString.self], options: nil) as? [String] {
-            // Support newline-separated paths (multi-select drag from collection browser)
-            paths = strings.flatMap { $0.components(separatedBy: "\n").filter { !$0.isEmpty } }
+
+        // Try pasteboard string items (in-app drag fallback)
+        if paths.isEmpty {
+            for item in pasteboard.pasteboardItems ?? [] {
+                if let str = item.string(forType: .string) {
+                    paths.append(contentsOf: str.components(separatedBy: "\n").filter { !$0.isEmpty })
+                }
+            }
         }
+
         guard !paths.isEmpty, let window = window else { return false }
         let mouseScreen = NSEvent.mouseLocation
         let mouseWindow = window.convertPoint(fromScreen: mouseScreen)
         let dropPoint = convert(mouseWindow, from: nil)
-        Logger.debug("performDragOperation: paths=\(paths.count) files, mouseScreen=\(mouseScreen), mouseWindow=\(mouseWindow), dropPoint(in canvas)=\(dropPoint), canvasFrame=\(frame), isFlipped=\(isFlipped)")
         onPhotosDropped?(paths, dropPoint)
         return true
     }

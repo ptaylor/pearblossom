@@ -43,6 +43,19 @@ struct CanvasView: NSViewRepresentable {
             context.coordinator.handleDrop(paths: paths, at: point, canvas: canvas)
         }
 
+        // Listen for deferred drops (after new collage created from blank canvas)
+        context.coordinator.canvasView = canvas
+        context.coordinator.deferredDropObserver = NotificationCenter.default.addObserver(
+            forName: .deferredDrop, object: nil, queue: .main
+        ) { [weak canvas] notif in
+            guard let canvas = canvas,
+                  let paths = notif.userInfo?["paths"] as? [String],
+                  let px = notif.userInfo?["pointX"] as? CGFloat,
+                  let py = notif.userInfo?["pointY"] as? CGFloat else { return }
+            let point = CGPoint(x: px, y: py)
+            context.coordinator.handleDrop(paths: paths, at: point, canvas: canvas)
+        }
+
         // Wire up auto-save on canvas mutations — also push changes back to binding
         // so Inspector toggles etc. don't overwrite dragged positions with stale data.
         canvas.onLayersChanged = { [weak canvas] in
@@ -93,7 +106,9 @@ struct CanvasView: NSViewRepresentable {
         var projectBinding: Binding<CollageProject?>
         var magnificationBinding: Binding<CGFloat>
         weak var scrollView: NSScrollView?
+        weak var canvasView: CanvasNSView?
         private var autoSaveWorkItem: DispatchWorkItem?
+        var deferredDropObserver: NSObjectProtocol?
 
         init(project: Binding<CollageProject?>, magnification: Binding<CGFloat>) {
             self.projectBinding = project
@@ -161,7 +176,17 @@ struct CanvasView: NSViewRepresentable {
         }
 
         func handleDrop(paths: [String], at point: CGPoint, canvas: CanvasNSView) {
-            guard var proj = projectBinding.wrappedValue else { return }
+            guard var proj = projectBinding.wrappedValue else {
+                let settings = AppSettings.shared
+                NotificationCenter.default.post(name: .blankCanvasDrop, object: nil, userInfo: [
+                    "paths": paths,
+                    "pointX": point.x,
+                    "pointY": point.y,
+                    "name": settings.activeCollectionName ?? "",
+                    "description": settings.activeCollectionDescription ?? ""
+                ])
+                return
+            }
 
             let settings = AppSettings.shared
             let scalePercent = settings.defaultPhotoScalePercent / 100.0
