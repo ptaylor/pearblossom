@@ -551,14 +551,13 @@ final class CanvasNSView: NSView {
                   var proj = project,
                   let index = proj.layers.firstIndex(where: { $0.id == id }) else { return }
             let anchor = resizeOppositeCorner
+            let shiftHeld = event.modifierFlags.contains(.shift)
 
             let newSize: CGSize
             let newCenter: CGPoint
 
-            switch corner {
-            case .top, .bottom, .left, .right:
-                // Edge resize: free-axis, no aspect ratio lock.
-                // Constrain to the axis being dragged.
+            if shiftHeld && (corner == .top || corner == .bottom || corner == .left || corner == .right) {
+                // Shift + edge = free-axis resize (no aspect ratio lock)
                 var w = proj.layers[index].size.width
                 var h = proj.layers[index].size.height
                 var cx = proj.layers[index].position.x
@@ -584,14 +583,39 @@ final class CanvasNSView: NSView {
                 }
                 newSize = CGSize(width: max(w, 20), height: max(h, 20))
                 newCenter = CGPoint(x: cx, y: cy)
-
-            case .topLeft, .topRight, .bottomLeft, .bottomRight:
-                // Corner resize: aspect-ratio locked, uniform scale.
-                let newW = abs(point.x - anchor.x)
-                let newH = newW / resizeAspectRatio
+            } else {
+                // Default: aspect-ratio-locked resize.
+                // For corners: derive size from X-distance to anchor.
+                // For edges: derive size from perpendicular distance to anchor.
+                let newW: CGFloat
+                let newH: CGFloat
+                let cx: CGFloat
+                let cy: CGFloat
+                switch corner {
+                case .top, .bottom:
+                    // Height changes; width follows from aspect ratio
+                    let newHeight = abs(point.y - anchor.y)
+                    newW = newHeight / resizeAspectRatio
+                    newH = newHeight
+                    cx = anchor.x
+                    cy = (anchor.y + point.y) / 2
+                case .left, .right:
+                    // Width changes; height follows from aspect ratio
+                    let newWidth = abs(point.x - anchor.x)
+                    newW = newWidth
+                    newH = newWidth / resizeAspectRatio
+                    cx = (anchor.x + point.x) / 2
+                    cy = anchor.y
+                default:
+                    // Corners: diagonal drag, derive from X-distance
+                    let w = abs(point.x - anchor.x)
+                    newW = w
+                    newH = w / resizeAspectRatio
+                    cx = (anchor.x + point.x) / 2
+                    cy = (anchor.y + point.y) / 2
+                }
                 newSize = CGSize(width: max(newW, 20), height: max(newH, 20))
-                newCenter = CGPoint(x: (anchor.x + point.x) / 2,
-                                    y: (anchor.y + point.y) / 2)
+                newCenter = CGPoint(x: cx, y: cy)
             }
 
             proj.layers[index].size = newSize
