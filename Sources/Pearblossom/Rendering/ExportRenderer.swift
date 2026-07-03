@@ -131,9 +131,12 @@ enum ExportRenderer {
         let outputWidth = ceil(boundingBox.width * scaleX)
         let outputHeight = ceil(boundingBox.height * scaleY)
 
-        // Fill background
-        let bg = CIImage(color: CIColor(cgColor: project.backgroundColor.cgColor))
-            .cropped(to: CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight))
+        // Fill background with the collage's background color.
+        // CIConstantColorGenerator is the canonical way to create a
+        // solid-color CIImage (CIImage(color:) + cropped can be unreliable).
+        let colorGen = CIFilter(name: "CIConstantColorGenerator")!
+        colorGen.setValue(CIColor(cgColor: project.backgroundColor.cgColor), forKey: kCIInputColorKey)
+        let bg = colorGen.outputImage!.cropped(to: CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight))
 
         var composite: CIImage = bg
 
