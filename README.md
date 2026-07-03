@@ -1,5 +1,9 @@
 # Pearblossom
 
+<p align="center">
+  <img src="PearblossomLogo.svg" alt="Pearblossom logo" width="200">
+</p>
+
 A native macOS desktop app for creating photo collages inspired by David Hockney's "Joiners" — composite images made from overlapping, freeform-arranged photographs. Named after Hockney's iconic photomontage *Pearblossom Highway*.
 
 ## Tech Stack
@@ -16,6 +20,8 @@ See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the full architecture reference —
 
 See [`AGENTS.md`](AGENTS.md) for LLM coding assistant conventions and instructions.
 
+See [`DESIGN.md`](DESIGN.md) for the JSON file format specifications (`.collage.json` and `.collection.json`).
+
 ## Viewing Logs
 
 Pearblossom uses Apple's unified logging system. Debug logging is enabled by default (toggle in Settings → General → Developer).
@@ -26,7 +32,3 @@ log stream --predicate 'subsystem == "com.pearblossom"' --level debug
 ```
 
 **In Console.app** (`/Applications/Utilities/Console`): filter by `subsystem:com.pearblossom`.
-
-## Status
-
-Early design phase. Implementation will proceed in stages.
