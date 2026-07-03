@@ -167,6 +167,12 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// The ID of the currently expanded collection.
+    @Published var activeCollectionID: UUID?
+
+    /// The IDs of the currently selected photos in the expanded collection.
+    @Published var activePhotoIDs: [UUID] = []
+
     /// The name of the currently expanded collection (for pre-filling new collage dialogs).
     @Published var activeCollectionName: String?
 

@@ -269,11 +269,15 @@ struct CollectionsListView: View {
                             expandedCollectionID = nil
                             settings.activeCollectionName = nil
                             settings.activeCollectionDescription = nil
+                            settings.activeCollectionID = nil
+                            settings.activePhotoIDs = []
                             Logger.debug("Collapsed collection '\(collection.name)'")
                         } else {
                             expandedCollectionID = collection.id
                             settings.activeCollectionName = collection.name
                             settings.activeCollectionDescription = collection.description
+                            settings.activeCollectionID = collection.id
+                            settings.activePhotoIDs = collection.photos.map { $0.id }
                             Logger.debug("Expanded collection '\(collection.name)' — \(collection.photos.count) photo(s)")
                             generateMissingThumbnails(for: collection)
                         }

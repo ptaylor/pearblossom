@@ -170,7 +170,9 @@ struct CollageProject: Codable, Identifiable {
 /// A single photo placed on the canvas.
 struct PhotoLayer: Codable, Identifiable {
     var id: UUID = UUID()
-    var photoPath: String
+    var photoPath: String = ""      // Runtime-only, not persisted
+    var collectionID: UUID?
+    var photoID: UUID?
     var position: CGPoint = .zero
     var size: CGSize = CGSize(width: 400, height: 300)
     var rotation: CGFloat = 0
@@ -182,13 +184,20 @@ struct PhotoLayer: Codable, Identifiable {
     var blendMode: String? = nil
 
     enum CodingKeys: String, CodingKey {
-        case id, photoPath, position, size, rotation, zOrder, opacity
+        case id, collectionID, photoID, position, size, rotation, zOrder, opacity
         case sourceResolution, cropRect, featherRadius, blendMode
     }
 
-    /// Resolves the photo path to an absolute path. Relative paths are resolved
-    /// against the Pearblossom root directory.
+    /// Resolves the photo's absolute file path from its collection reference.
+    /// Falls back to the runtime-only `photoPath` field (used for Finder drops,
+    /// not persisted to JSON).
     func resolvedPhotoPath() -> String {
+        if let collID = collectionID, let pID = photoID,
+           let collection = PhotoCollection.find(by: collID),
+           let photo = collection.photos.first(where: { $0.id == pID }) {
+            return photo.resolvedPath(relativeTo: collection.folderPath)
+        }
+        // Runtime fallback (Finder drops, not in JSON)
         if photoPath.hasPrefix("/") { return photoPath }
         let root = AppSettings.shared.collectionsRoot.path
         return (root as NSString).appendingPathComponent(photoPath)

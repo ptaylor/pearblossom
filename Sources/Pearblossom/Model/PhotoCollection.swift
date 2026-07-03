@@ -52,6 +52,29 @@ struct PhotoCollection: Codable, Identifiable {
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         modifiedAt = try container.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? Date()
     }
+
+    // MARK: - Lookup
+
+    /// Finds a collection by its UUID by scanning the Collections directory on disk.
+    /// This is a disk-based lookup — no in-memory cache for v1.
+    static func find(by id: UUID) -> PhotoCollection? {
+        let settings = AppSettings.shared
+        let dir = settings.collectionsDir
+        let fm = FileManager.default
+        guard let contents = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil, options: .skipsHiddenFiles) else {
+            return nil
+        }
+        for folderURL in contents {
+            var isDir: ObjCBool = false
+            guard fm.fileExists(atPath: folderURL.path, isDirectory: &isDir), isDir.boolValue else { continue }
+            let jsonURL = folderURL.appendingPathComponent(settings.collectionFileName)
+            guard let data = try? Data(contentsOf: jsonURL),
+                  let collection = try? JSONDecoder().decode(PhotoCollection.self, from: data),
+                  collection.id == id else { continue }
+            return collection
+        }
+        return nil
+    }
 }
 
 struct CollectionPhoto: Codable, Identifiable {

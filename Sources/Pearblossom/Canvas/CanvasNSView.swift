@@ -24,7 +24,7 @@ final class CanvasNSView: NSView {
         }
     }
 
-    var onPhotosDropped: (([String], CGPoint) -> Void)?
+    var onPhotosDropped: (([String], CGPoint, UUID?, [UUID]) -> Void)?
     var onLayersChanged: (() -> Void)?
 
     private var selectedLayerIDs = Set<UUID>()
@@ -810,7 +810,7 @@ final class CanvasNSView: NSView {
             paths = urls.map { $0.path }
         }
 
-        // Try pasteboard string items (in-app drag fallback)
+        // Try pasteboard string items (in-app drag)
         if paths.isEmpty {
             for item in pasteboard.pasteboardItems ?? [] {
                 if let str = item.string(forType: .string) {
@@ -823,7 +823,7 @@ final class CanvasNSView: NSView {
         let mouseScreen = NSEvent.mouseLocation
         let mouseWindow = window.convertPoint(fromScreen: mouseScreen)
         let dropPoint = convert(mouseWindow, from: nil)
-        onPhotosDropped?(paths, dropPoint)
+        onPhotosDropped?(paths, dropPoint, nil, [])
         return true
     }
 

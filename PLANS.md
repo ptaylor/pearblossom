@@ -101,7 +101,11 @@ Future:
     * Images in Collage use collecion and id instead of path
     * Hanging issues
     * Performance
+    * Docs for JSON
+    * Help
+    * Image in README
     
+
     
 
 

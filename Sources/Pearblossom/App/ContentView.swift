@@ -8,6 +8,8 @@ struct BlankCanvasPrefill: Identifiable {
     let description: String
     let paths: [String]
     let point: CGPoint
+    let collectionID: UUID?
+    let photoIDs: [UUID]
 }
 
 /// The main content view with the three-column layout.
@@ -50,9 +52,12 @@ struct ContentView: View {
                   let py = notif.userInfo?["pointY"] as? CGFloat else { return }
             let name = notif.userInfo?["name"] as? String ?? ""
             let desc = notif.userInfo?["description"] as? String ?? ""
+            let collID = notif.userInfo?["collectionID"] as? UUID
+            let pIDs = notif.userInfo?["photoIDs"] as? [UUID] ?? []
             blankCanvasPrefill = BlankCanvasPrefill(
                 name: name, description: desc,
-                paths: paths, point: CGPoint(x: px, y: py)
+                paths: paths, point: CGPoint(x: px, y: py),
+                collectionID: collID, photoIDs: pIDs
             )
         }
         .sheet(item: $blankCanvasPrefill) { prefill in
@@ -60,11 +65,14 @@ struct ContentView: View {
                 currentProject = newCollage
                 DispatchQueue.main.async {
                     DispatchQueue.main.async {
-                        NotificationCenter.default.post(name: .deferredDrop, object: nil, userInfo: [
+                        let userInfo: [AnyHashable: Any] = [
                             "paths": prefill.paths,
                             "pointX": prefill.point.x,
-                            "pointY": prefill.point.y
-                        ])
+                            "pointY": prefill.point.y,
+                            "collectionID": prefill.collectionID as Any,
+                            "photoIDs": prefill.photoIDs
+                        ]
+                        NotificationCenter.default.post(name: .deferredDrop, object: nil, userInfo: userInfo)
                     }
                 }
             }
@@ -73,6 +81,8 @@ struct ContentView: View {
 
     private func handleCanvasDrop(providers: [NSItemProvider]) {
         var allPaths: [String] = []
+        var parsedCollectionID: UUID?
+        var parsedPhotoIDs: [UUID] = []
         let group = DispatchGroup()
 
         for provider in providers {
@@ -85,7 +95,24 @@ struct ContentView: View {
                 }
             } else if provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier) {
                 provider.loadItem(forTypeIdentifier: UTType.plainText.identifier, options: nil) { item, _ in
-                    if let str = item as? String { allPaths.append(contentsOf: str.components(separatedBy: "\n").filter { !$0.isEmpty }) }
+                    if let str = item as? String {
+                        let parts = str.components(separatedBy: "\n").filter { !$0.isEmpty }
+                        // Parse collection metadata from first line
+                        if let meta = parts.first, meta.hasPrefix("COLLID:") {
+                            for segment in meta.components(separatedBy: "|") {
+                                if segment.hasPrefix("COLLID:"),
+                                   let uuid = UUID(uuidString: String(segment.dropFirst(7))) {
+                                    parsedCollectionID = uuid
+                                } else if segment.hasPrefix("PHOTOIDS:") {
+                                    let idStrings = String(segment.dropFirst(9)).components(separatedBy: ",")
+                                    parsedPhotoIDs = idStrings.compactMap { UUID(uuidString: $0) }
+                                }
+                            }
+                            allPaths.append(contentsOf: parts.dropFirst())
+                        } else {
+                            allPaths.append(contentsOf: parts)
+                        }
+                    }
                     group.leave()
                 }
             } else {
@@ -101,14 +128,18 @@ struct ContentView: View {
 
             if currentProject != nil {
                 NotificationCenter.default.post(name: .deferredDrop, object: nil, userInfo: [
-                    "paths": allPaths, "pointX": point.x, "pointY": point.y
+                    "paths": allPaths, "pointX": point.x, "pointY": point.y,
+                    "collectionID": parsedCollectionID as Any,
+                    "photoIDs": parsedPhotoIDs
                 ])
             } else {
                 let settings = AppSettings.shared
                 blankCanvasPrefill = BlankCanvasPrefill(
                     name: settings.activeCollectionName ?? "",
                     description: settings.activeCollectionDescription ?? "",
-                    paths: allPaths, point: point
+                    paths: allPaths, point: point,
+                    collectionID: parsedCollectionID,
+                    photoIDs: parsedPhotoIDs
                 )
             }
         }

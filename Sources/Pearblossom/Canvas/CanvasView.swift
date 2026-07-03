@@ -38,9 +38,10 @@ struct CanvasView: NSViewRepresentable {
         let canvas = CanvasNSView(frame: NSRect(x: 0, y: 0, width: CGFloat(canvasSize), height: CGFloat(canvasHeight)))
 
         // Wire up drop handling
-        canvas.onPhotosDropped = { [weak canvas] paths, point in
+        canvas.onPhotosDropped = { [weak canvas] paths, point, collID, pIDs in
             guard let canvas = canvas else { return }
-            context.coordinator.handleDrop(paths: paths, at: point, canvas: canvas)
+            context.coordinator.handleDrop(paths: paths, at: point, canvas: canvas,
+                                           collectionID: collID, photoIDs: pIDs)
         }
 
         // Listen for deferred drops (after new collage created from blank canvas)
@@ -53,7 +54,10 @@ struct CanvasView: NSViewRepresentable {
                   let px = notif.userInfo?["pointX"] as? CGFloat,
                   let py = notif.userInfo?["pointY"] as? CGFloat else { return }
             let point = CGPoint(x: px, y: py)
-            context.coordinator.handleDrop(paths: paths, at: point, canvas: canvas)
+            let collID = notif.userInfo?["collectionID"] as? UUID
+            let photoIDs = notif.userInfo?["photoIDs"] as? [UUID] ?? []
+            context.coordinator.handleDrop(paths: paths, at: point, canvas: canvas,
+                                           collectionID: collID, photoIDs: photoIDs)
         }
 
         // Wire up auto-save on canvas mutations — also push changes back to binding
@@ -175,7 +179,8 @@ struct CanvasView: NSViewRepresentable {
             Logger.debug("fitToBoundingBox: bb=\(bb) viewSize=\(viewSize) mag=\(mag) visibleRect=\(visibleRect) scrollTo=(\(scrollX), \(scrollY))")
         }
 
-        func handleDrop(paths: [String], at point: CGPoint, canvas: CanvasNSView) {
+        func handleDrop(paths: [String], at point: CGPoint, canvas: CanvasNSView,
+                        collectionID: UUID? = nil, photoIDs: [UUID] = []) {
             guard var proj = projectBinding.wrappedValue else {
                 let settings = AppSettings.shared
                 NotificationCenter.default.post(name: .blankCanvasDrop, object: nil, userInfo: [
@@ -183,7 +188,9 @@ struct CanvasView: NSViewRepresentable {
                     "pointX": point.x,
                     "pointY": point.y,
                     "name": settings.activeCollectionName ?? "",
-                    "description": settings.activeCollectionDescription ?? ""
+                    "description": settings.activeCollectionDescription ?? "",
+                    "collectionID": collectionID as Any,
+                    "photoIDs": photoIDs
                 ])
                 return
             }
@@ -197,26 +204,42 @@ struct CanvasView: NSViewRepresentable {
 
             Logger.debug("handleDrop: \(paths.count) file(s), dropPoint=\(point), canvasSize=\(canvasSize), targetDim=\(targetDim) (scalePercent=\(scalePercent)), maxZ=\(maxZ)")
 
-            for path in paths {
-                // Source image point size (NSImage)
+            for (index, path) in paths.enumerated() {
                 let nsImage = NSImage(contentsOfFile: path)
                 let nsImageSize = nsImage?.size ?? .zero
 
-                // Use NSImage.size for sourceResolution
                 let sourceSize = nsImageSize
                 let scale = sourceSize.width > 0
                     ? min(targetDim / sourceSize.width, targetDim / sourceSize.height)
                     : 1.0
                 let displaySize = CGSize(width: sourceSize.width * scale, height: sourceSize.height * scale)
 
-                // Position: center of the placed layer
                 let centerPos = CGPoint(x: point.x + cascadeOffset, y: point.y + cascadeOffset)
 
-                // Store relative path if photo is inside the Pearblossom root directory
                 let storedPath = relativePath(from: path)
+
+                // Resolve collectionID and photoID by matching the path against
+                // the active collection's photos
+                let settings = AppSettings.shared
+                let collID: UUID?
+                let pid: UUID?
+                if let activeID = settings.activeCollectionID,
+                   let collection = PhotoCollection.find(by: activeID) {
+                    collID = activeID
+                    // Match by resolved path
+                    let matching = collection.photos.first { photo in
+                        photo.resolvedPath(relativeTo: collection.folderPath) == path
+                    }
+                    pid = matching?.id
+                } else {
+                    collID = nil
+                    pid = nil
+                }
 
                 let layer = PhotoLayer(
                     photoPath: storedPath,
+                    collectionID: collID,
+                    photoID: pid,
                     position: centerPos,
                     size: displaySize,
                     zOrder: maxZ + 1 + proj.layers.count,
