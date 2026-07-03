@@ -24,6 +24,9 @@ final class AppSettings: ObservableObject {
         static let defaultBackgroundBlue = "defaultBackgroundBlue"
         static let defaultBorderMargin = "defaultBorderMargin"
         static let defaultPhotoScalePercent = "defaultPhotoScalePercent"
+        static let defaultExportFormat = "defaultExportFormat"
+        static let defaultJPEGQuality = "defaultJPEGQuality"
+        static let defaultExportScale = "defaultExportScale"
     }
 
     // MARK: - Defaults
@@ -143,6 +146,27 @@ final class AppSettings: ObservableObject {
         }
     }
 
+    /// Default export format (default: png).
+    @Published var defaultExportFormat: ExportFormat {
+        didSet {
+            defaults.set(defaultExportFormat.rawValue, forKey: Keys.defaultExportFormat)
+        }
+    }
+
+    /// Default JPEG export quality 0.0–1.0 (default: 0.92).
+    @Published var defaultJPEGQuality: Double {
+        didSet {
+            defaults.set(defaultJPEGQuality, forKey: Keys.defaultJPEGQuality)
+        }
+    }
+
+    /// Default export scale multiplier (default: 1.0 = source resolution).
+    @Published var defaultExportScale: Double {
+        didSet {
+            defaults.set(defaultExportScale, forKey: Keys.defaultExportScale)
+        }
+    }
+
     // MARK: - Init
 
     private init() {
@@ -249,6 +273,20 @@ final class AppSettings: ObservableObject {
         // Load default photo scale percent (default: 30)
         let savedScale = defaults.double(forKey: Keys.defaultPhotoScalePercent)
         self.defaultPhotoScalePercent = savedScale > 0 ? savedScale : 30
+
+        // Load export defaults
+        if let formatRaw = defaults.string(forKey: Keys.defaultExportFormat),
+           let fmt = ExportFormat(rawValue: formatRaw) {
+            self.defaultExportFormat = fmt
+        } else {
+            self.defaultExportFormat = .png
+        }
+
+        let savedJPEGQuality = defaults.double(forKey: Keys.defaultJPEGQuality)
+        self.defaultJPEGQuality = savedJPEGQuality > 0 ? savedJPEGQuality : 0.92
+
+        let savedExportScale = defaults.double(forKey: Keys.defaultExportScale)
+        self.defaultExportScale = savedExportScale > 0 ? savedExportScale : 1.0  // 1.0 = source resolution
 
         // Ensure subdirectories exist (safe to call after all properties initialized)
         prepareDirectories()

@@ -6,6 +6,7 @@ struct InspectorView: View {
 
     @Binding var project: CollageProject?
     @Binding var magnification: CGFloat
+    @State private var showExportSheet = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -31,6 +32,8 @@ struct InspectorView: View {
                     if let binding = Binding($project) {
                         Divider()
                         canvasInfoSection(binding.wrappedValue)
+                        Divider()
+                        exportSection
                     }
                 }
                 .padding()
@@ -45,6 +48,11 @@ struct InspectorView: View {
             }
         }
         .frame(minWidth: 240)
+        .sheet(isPresented: $showExportSheet) {
+            if let proj = project {
+                ExportSettingsView(project: proj)
+            }
+        }
     }
 
     // MARK: - Background Section
@@ -208,4 +216,29 @@ struct InspectorView: View {
                 .foregroundColor(.secondary)
         }
     }
+
+    // MARK: - Export Section
+
+    private var exportSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Button {
+                showExportSheet = true
+            } label: {
+                Label("Export Collage…", systemImage: "square.and.arrow.up")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+            .help("Export the collage as PNG or JPEG")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .triggerExport)) { _ in
+            if project != nil {
+                showExportSheet = true
+            }
+        }
+    }
+}
+
+extension Notification.Name {
+    /// Posted to open the Export sheet (from the menu bar).
+    static let triggerExport = Notification.Name("PearblossomTriggerExport")
 }

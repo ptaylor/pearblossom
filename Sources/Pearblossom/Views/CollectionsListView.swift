@@ -21,6 +21,7 @@ struct CollectionsListView: View {
     @State private var dirWarningMessage = ""
     @State private var expandedCollectionID: UUID? = nil
     @State private var selectedPhotoIDs: Set<UUID> = []
+    @State private var selectedPhotoDimensions: CGSize? = nil
     // Sort prefs are persisted in AppSettings, mirrored here for binding
     @State private var sortOrder: CollectionSortOrder
     @State private var sortAscending: Bool
@@ -293,8 +294,24 @@ struct CollectionsListView: View {
                 if expandedCollectionID == collection.id && !collection.photos.isEmpty {
                     thumbnailGrid(for: collection)
                         .padding(.leading, 20)
-                        .padding(.bottom, 8)
+                        .padding(.bottom, 4)
                         .listRowInsets(EdgeInsets())
+
+                    // Photo info when a single photo is selected
+                    if selectedPhotoIDs.count == 1,
+                       let selectedPhoto = collection.photos.first(where: { selectedPhotoIDs.contains($0.id) }) {
+                        photoInfoRow(photo: selectedPhoto, collection: collection)
+                            .padding(.leading, 20)
+                            .padding(.bottom, 8)
+                            .listRowInsets(EdgeInsets())
+                    } else if selectedPhotoIDs.count > 1 {
+                        Text("\(selectedPhotoIDs.count) photos selected")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                            .padding(.leading, 20)
+                            .padding(.bottom, 8)
+                            .listRowInsets(EdgeInsets())
+                    }
                 }
             }
         }
@@ -371,16 +388,108 @@ struct CollectionsListView: View {
                     selectedPhotoIDs: selectedPhotoIDs,
                     onTap: {
                         togglePhotoSelection(photo.id)
+                        loadSelectedPhotoDimensions(for: collection)
                     },
                     onShiftTap: {
                         toggleShiftSelection(in: collection, upTo: index)
+                        loadSelectedPhotoDimensions(for: collection)
                     },
                     onRemove: {
                         removePhotos([photo.id], from: collection)
+                        selectedPhotoDimensions = nil
                     }
                 )
             }
         }
+    }
+
+    // MARK: - Photo Info Row
+
+    /// Shows path, dimensions, and collection name for the selected photo.
+    @ViewBuilder
+    private func photoInfoRow(photo: CollectionPhoto, collection: PhotoCollection) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 4) {
+                Image(systemName: "info.circle")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                Text("Photo Info")
+                    .font(.caption)
+                    .fontWeight(.semibold)
+                    .foregroundColor(.secondary)
+            }
+
+            Text(photo.resolvedPath(relativeTo: collection.folderPath))
+                .font(.caption2)
+                .foregroundColor(.secondary)
+                .lineLimit(2)
+                .truncationMode(.middle)
+                .help(photo.resolvedPath(relativeTo: collection.folderPath))
+
+            HStack(spacing: 8) {
+                if let dims = selectedPhotoDimensions {
+                    Text("\(Int(dims.width)) × \(Int(dims.height)) px")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                        .monospacedDigit()
+                } else {
+                    Text("Loading…")
+                        .font(.caption2)
+                        .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+                        .italic()
+                }
+
+                Text("•")
+                    .font(.caption2)
+                    .foregroundColor(Color(nsColor: .tertiaryLabelColor))
+
+                Text(collection.name)
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 4)
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 5)
+                .fill(Color(nsColor: .controlBackgroundColor).opacity(0.5))
+        )
+    }
+
+    /// Reads the pixel dimensions of the currently selected photo (if exactly one is selected).
+    private func loadSelectedPhotoDimensions(for collection: PhotoCollection) {
+        guard selectedPhotoIDs.count == 1,
+              let selectedID = selectedPhotoIDs.first,
+              let photo = collection.photos.first(where: { $0.id == selectedID }) else {
+            selectedPhotoDimensions = nil
+            return
+        }
+
+        let path = photo.resolvedPath(relativeTo: collection.folderPath)
+        DispatchQueue.global(qos: .userInitiated).async {
+            let dims = Self.imageDimensions(at: path)
+            DispatchQueue.main.async {
+                // Only update if this photo is still the single selected one
+                if selectedPhotoIDs.count == 1, selectedPhotoIDs.first == selectedID {
+                    selectedPhotoDimensions = dims
+                }
+            }
+        }
+    }
+
+    /// Reads image pixel dimensions using CGImageSource (fast, doesn't fully decode).
+    private static func imageDimensions(at path: String) -> CGSize? {
+        guard let src = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil) else {
+            return nil
+        }
+        guard let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any],
+              let width = props[kCGImagePropertyPixelWidth] as? CGFloat,
+              let height = props[kCGImagePropertyPixelHeight] as? CGFloat else {
+            return nil
+        }
+        return CGSize(width: width, height: height)
     }
 
     // MARK: - Collection Picker Popover

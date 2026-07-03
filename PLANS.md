@@ -70,6 +70,8 @@ Collage Canvas layering feature:
     It should be possible to resize a selected image easily using a handle and mouse - rotation should be smooth and the image clearly display at its depth correctly and in relation to overlapping images.  The UX on this is important to get right but this feature is less important. that the rotation feature.
 
 
+==============================================
+
 
 
 Collage Export feature:
@@ -93,4 +95,13 @@ Future:
     * Auto generaete collage
     * Caching of intermediate sized images
     * Crashing deleting collage
+    * highlight collection / collage in left panel
+    
+    * REDUCE logging
+    * Remove "view " from panel
+    
+
+    BUGS   
+    * resizing from sided does not work
+    * left / right arrows for relaying ?
 

@@ -44,6 +44,13 @@ struct PearblossomApp: App {
                     NotificationCenter.default.post(name: .triggerImport, object: nil)
                 }
                 .keyboardShortcut("i", modifiers: [.command, .shift])
+
+                Divider()
+
+                Button("Export Collage…") {
+                    NotificationCenter.default.post(name: .triggerExport, object: nil)
+                }
+                .keyboardShortcut("e", modifiers: .command)
             }
 
             // Settings — placed in the app menu (Pearblossom → Settings…)
