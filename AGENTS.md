@@ -10,6 +10,8 @@ A macOS desktop app for creating photo collages in the style of David Hockney's 
 
 **Read `ARCHITECTURE.md` before writing any code.** It is the authoritative source for all design decisions, data models, and implementation constraints. This file covers day-to-day coding conventions.
 
+**Keep `DESIGN.md` in sync** with any changes to the JSON file formats, data model fields, or directory layout. If you add, remove, or rename a property in `PhotoLayer`, `CollageProject`, `PhotoCollection`, or `CollectionPhoto`, update the field tables in `DESIGN.md` in the same commit.
+
 ## Stack & Constraints
 
 - **Language**: Swift (latest stable)
