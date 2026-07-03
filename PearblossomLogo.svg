@@ -1,32 +1,32 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <defs>
-    <clipPath id="sq">
-      <rect x="40" y="40" width="432" height="432" rx="32"/>
-    </clipPath>
-  </defs>
+  <!-- Tapered trunk — thick, narrowing upward -->
+  <polygon points="240,440 272,440 266,280 246,280" fill="#5A8A9A"/>
+  <!-- Y-split branches -->
+  <polygon points="246,280 266,280 216,185 202,188" fill="#5A8A9A"/>
+  <polygon points="246,280 266,280 340,180 326,183" fill="#5A8A9A"/>
 
-  <rect x="40" y="40" width="432" height="432" rx="32" fill="#1E1E20"/>
+  <!-- Larger canopy — photo rectangles as leaves, scaled up -->
+  <!-- Left branch -->
+  <rect x="115" y="140" width="62" height="44" rx="5" fill="#C8E6C9" transform="rotate(-18, 146, 162)"/>
+  <rect x="105" y="180" width="56" height="40" rx="5" fill="#DCEDC8" transform="rotate(10, 133, 200)"/>
+  <rect x="145" y="105" width="52" height="38" rx="5" fill="#A5D6A7" transform="rotate(-8, 171, 124)"/>
+  <rect x="90" y="210" width="48" height="34" rx="5" fill="#C5E1A5" transform="rotate(24, 114, 227)"/>
+  <rect x="165" y="185" width="44" height="30" rx="5" fill="#F0F4C3" transform="rotate(-14, 187, 200)"/>
 
-  <g clip-path="url(#sq)">
-    <!-- Wide bottom block — muted olive -->
-    <rect x="100" y="310" width="312" height="130" rx="20" fill="#7B8D5C" opacity="0.82" transform="rotate(-3 256 375)"/>
+  <!-- Right branch -->
+  <rect x="340" y="135" width="62" height="44" rx="5" fill="#DCEDC8" transform="rotate(20, 371, 157)"/>
+  <rect x="358" y="175" width="56" height="40" rx="5" fill="#C8E6C9" transform="rotate(-10, 386, 195)"/>
+  <rect x="318" y="105" width="52" height="38" rx="5" fill="#A5D6A7" transform="rotate(10, 344, 124)"/>
+  <rect x="375" y="210" width="48" height="34" rx="5" fill="#F0F4C3" transform="rotate(-24, 399, 227)"/>
+  <rect x="305" y="182" width="44" height="30" rx="5" fill="#C5E1A5" transform="rotate(15, 327, 197)"/>
 
-    <!-- Middle block — softer green -->
-    <rect x="140" y="210" width="232" height="120" rx="16" fill="#9CAF78" opacity="0.78" transform="rotate(2 256 270)"/>
+  <!-- Top / center -->
+  <rect x="202" y="75" width="66" height="48" rx="5" fill="#A5D6A7" transform="rotate(-4, 235, 99)"/>
+  <rect x="225" y="115" width="52" height="38" rx="5" fill="#F0F4C3" transform="rotate(12, 251, 134)"/>
+  <rect x="185" y="118" width="46" height="32" rx="5" fill="#C8E6C9" transform="rotate(-16, 208, 134)"/>
+  <rect x="250" y="145" width="42" height="30" rx="5" fill="#DCEDC8" transform="rotate(-6, 271, 160)"/>
 
-    <!-- Top block — lighter / yellow-green -->
-    <rect x="180" y="120" width="152" height="110" rx="14" fill="#BCC99A" opacity="0.74" transform="rotate(-1 256 175)"/>
-
-    <!-- Accent slice — teal -->
-    <rect x="200" y="280" width="112" height="40" rx="10" fill="#6B9080" opacity="0.55" transform="rotate(1 256 300)"/>
-
-    <!-- Stem — dark slim rect -->
-    <rect x="251" y="70" width="10" height="60" rx="5" fill="#5A6B44"/>
-
-    <!-- Small leaf — angled rect -->
-    <rect x="268" y="72" width="42" height="14" rx="7" fill="#7FA358" opacity="0.75" transform="rotate(-35 289 79)"/>
-  </g>
-
-  <text x="256" y="490" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="20" font-weight="300" letter-spacing="12" fill="#666">pearblossom</text>
+  <!-- App name -->
+  <text x="256" y="490" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="24" font-weight="300" letter-spacing="12" fill="#E8B896">pearblossom</text>
 </svg>
