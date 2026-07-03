@@ -177,12 +177,13 @@ enum ExportRenderer {
             t = t.transformed(by: CGAffineTransform(scaleX: sx, y: sy))
 
             // Position relative to bounding box origin.
-            // In canvas space, layer.position is relative to (0,0).
-            // The bounding box origin in canvas space is boundingBox.origin.
-            // In export space, we map (x - bb.origin.x) * scaleX.
-            // The -halfW/-halfH maps from center-based to top-left-based positioning.
+            // Canvas uses top-left origin; CIImage uses bottom-left origin.
+            // Flip Y: ciY = outputHeight - canvasY.
+            // (layer.position.y - bb.origin.y) * scaleY gives canvas-space Y
+            // relative to the top of the bounding box.
+            // -halfW/-halfH converts from center-based to corner-based positioning.
             let exportX = (layer.position.x - boundingBox.origin.x) * scaleX - halfW
-            let exportY = (layer.position.y - boundingBox.origin.y) * scaleY - halfH
+            let exportY = outputHeight - (layer.position.y - boundingBox.origin.y) * scaleY - halfH
 
             t = t.transformed(by: CGAffineTransform(translationX: exportX, y: exportY))
 
