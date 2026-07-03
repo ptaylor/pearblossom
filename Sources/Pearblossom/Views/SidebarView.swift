@@ -15,7 +15,7 @@ struct SidebarView: View {
     var body: some View {
         VStack(spacing: 0) {
             // Tab picker
-            Picker("View", selection: $selectedTab) {
+            Picker("", selection: $selectedTab) {
                 ForEach(SidebarTab.allCases, id: \.self) { tab in
                     Text(tab.rawValue).tag(tab)
                 }

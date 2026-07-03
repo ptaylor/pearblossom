@@ -17,6 +17,7 @@ struct ExportSettingsView: View {
     @State private var isExporting = false
     @State private var exportError: String?
     @State private var sourceDPI: CGFloat? = nil
+    @State private var exportFileName: String = ""
 
     private let ciContext = CIContext()
 
@@ -148,6 +149,22 @@ struct ExportSettingsView: View {
                     .foregroundColor(.red)
             }
 
+            // File name
+            VStack(alignment: .leading, spacing: 6) {
+                Text("File Name")
+                    .font(.headline)
+                TextField("File name", text: $exportFileName)
+                    .textFieldStyle(.roundedBorder)
+                    .onChange(of: exportFileName) { _, newValue in
+                        // Sanitize: no path separators
+                        exportFileName = newValue.replacingOccurrences(of: "/", with: "")
+                            .replacingOccurrences(of: ":", with: "")
+                    }
+                Text(".\(selectedFormat.fileExtension)")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
             // Buttons
             HStack(spacing: 12) {
                 Button("Cancel") {
@@ -188,6 +205,8 @@ struct ExportSettingsView: View {
                     sourceDPI = dpi
                 }
             }
+            // Default filename from collage name
+            exportFileName = project.name
         }
     }
 
@@ -226,7 +245,7 @@ struct ExportSettingsView: View {
     private func presentSavePanel(with image: CGImage) {
         let panel = NSSavePanel()
         panel.allowedContentTypes = [selectedFormat.utType]
-        panel.nameFieldStringValue = "\(project.name).\(selectedFormat.fileExtension)"
+        panel.nameFieldStringValue = "\(exportFileName).\(selectedFormat.fileExtension)"
         panel.canCreateDirectories = true
         panel.title = "Export Collage"
 

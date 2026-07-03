@@ -41,6 +41,7 @@ final class CanvasNSView: NSView {
 
     private enum ResizeCorner {
         case topLeft, topRight, bottomLeft, bottomRight
+        case top, bottom, left, right
     }
 
     private var interactionMode: InteractionMode = .none
@@ -132,38 +133,30 @@ final class CanvasNSView: NSView {
         let canvasH = bounds.height
         var composite: CIImage?
 
-        Logger.debug("renderLayers: rendering \(sorted.count) layers, canvasBounds=\(bounds), canvasH=\(canvasH)")
-
-        for (idx, layer) in sorted.enumerated() {
+        for layer in sorted {
             let resolvedPath = layer.resolvedPhotoPath()
 
             // Use cached source image or load with reduced resolution for display
             let sourceImage: CIImage
-            let wasLoadedFromCache: Bool
             if let cached = sourceImageCache[layer.id] {
                 sourceImage = cached
-                wasLoadedFromCache = true
             } else {
                 let url = URL(fileURLWithPath: resolvedPath)
                 if let img = CIImage(contentsOf: url, options: [.applyOrientationProperty: true]) {
-                    let originalExtent = img.extent
                     // Display at reduced size for performance
                     let maxDim: CGFloat = 1024
                     let extent = img.extent
                     if extent.width > maxDim || extent.height > maxDim {
                         let ds = min(maxDim / extent.width, maxDim / extent.height)
                         sourceImage = img.transformed(by: CGAffineTransform(scaleX: ds, y: ds))
-                        Logger.debug("renderLayers: layer[\(idx)] id=\(layer.id) loaded ciExtent=\(originalExtent.size) downscale=\(ds) workingExtent=\(sourceImage.extent.size) sourceResolution=\(layer.sourceResolution) displaySize=\(layer.size)")
                     } else {
                         sourceImage = img
-                        Logger.debug("renderLayers: layer[\(idx)] id=\(layer.id) loaded ciExtent=\(originalExtent.size) (no downscale) sourceResolution=\(layer.sourceResolution) displaySize=\(layer.size)")
                     }
                     sourceImageCache[layer.id] = sourceImage
                 } else {
-                    Logger.warn("renderLayers: layer[\(idx)] id=\(layer.id) failed to load CIImage from \(resolvedPath)")
+                    Logger.warn("renderLayers: failed to load CIImage from \(resolvedPath)")
                     continue
                 }
-                wasLoadedFromCache = false
             }
 
             let halfW = layer.size.width / 2
@@ -176,10 +169,8 @@ final class CanvasNSView: NSView {
             let workingExtent = sourceImage.extent
             let sx = layer.size.width / max(workingExtent.width, 1)
             let sy = layer.size.height / max(workingExtent.height, 1)
-            Logger.debug("renderLayers: layer[\(idx)] id=\(layer.id) scaleFactors sx=\(sx) sy=\(sy) (displaySize=\(layer.size) / workingExtent=\(workingExtent.size)) sourceResolution=\(layer.sourceResolution) cached=\(wasLoadedFromCache)")
 
             t = t.transformed(by: CGAffineTransform(scaleX: sx, y: sy))
-            Logger.debug("renderLayers: layer[\(idx)] id=\(layer.id) after scaleToDisplay: extent=\(t.extent)")
 
             // Rotate around center
             t = t.transformed(by: CGAffineTransform(translationX: -halfW, y: -halfH))
@@ -192,8 +183,6 @@ final class CanvasNSView: NSView {
                 translationX: layer.position.x - halfW,
                 y: canvasH - layer.position.y - halfH
             ))
-
-            Logger.debug("renderLayers: layer[\(idx)] id=\(layer.id) finalPlacement: position(center)=\(layer.position) rotation=\(layer.rotation) finalExtent=\(t.extent)")
 
             // Opacity
             if layer.opacity < 1.0 {
@@ -239,7 +228,6 @@ final class CanvasNSView: NSView {
         cgContext.scaleBy(x: 1.0, y: -1.0)
         cgContext.draw(cgImage, in: CGRect(origin: .zero, size: drawRect.size))
         cgContext.restoreGState()
-        Logger.debug("drawCGImageFlipped: extent(ci)=\(extent) drawRect(canvas)=\(drawRect)")
     }
 
     private func drawSelectionBorder(for layer: PhotoLayer, in context: CGContext) {
@@ -348,6 +336,8 @@ final class CanvasNSView: NSView {
                 arrows = [(CGPoint(x: base.x - dx, y: base.y - dy), CGPoint(x: base.x + dx, y: base.y + dy)),
                           (CGPoint(x: base.x + dx, y: base.y + dy), CGPoint(x: base.x + dx*0.3, y: base.y + dy*1.5)),
                           (CGPoint(x: base.x + dx, y: base.y + dy), CGPoint(x: base.x + dx*1.5, y: base.y + dy*0.3))]
+            case .top, .bottom, .left, .right:
+                arrows = []  // edge handles have no directional arrows
             }
             context.setStrokeColor(NSColor.systemBlue.cgColor)
             context.setLineWidth(1.2)
@@ -357,6 +347,25 @@ final class CanvasNSView: NSView {
                 context.addLine(to: to)
             }
             context.strokePath()
+        }
+
+        // Edge midpoint handles — small rectangles at the center of each edge
+        let midHandleW: CGFloat = 18
+        let midHandleH: CGFloat = 5
+        let midHandles: [(CGPoint, CGFloat)] = [
+            (CGPoint(x: rect.midX, y: rect.minY), 0),          // top (horizontal)
+            (CGPoint(x: rect.midX, y: rect.maxY), 0),          // bottom (horizontal)
+            (CGPoint(x: rect.minX, y: rect.midY), .pi / 2),    // left (vertical)
+            (CGPoint(x: rect.maxX, y: rect.midY), .pi / 2),    // right (vertical)
+        ]
+        for (pt, _) in midHandles {
+            let mr = CGRect(x: pt.x - midHandleW/2, y: pt.y - midHandleH/2,
+                            width: midHandleW, height: midHandleH)
+            context.setFillColor(NSColor.white.cgColor)
+            context.fill(mr)
+            context.setStrokeColor(NSColor.systemBlue.cgColor)
+            context.setLineWidth(1)
+            context.stroke(mr)
         }
     }
 
@@ -408,7 +417,7 @@ final class CanvasNSView: NSView {
         return (dx*dx + dy*dy) <= (hitRadius * hitRadius) ? layer : nil
     }
 
-    /// Returns the resize corner if the point hits a handle of the selected layer.
+    /// Returns the resize corner or edge if the point hits a handle of the selected layer.
     private func resizeHandleHit(at point: CGPoint) -> (PhotoLayer, ResizeCorner)? {
         guard selectedLayerIDs.count == 1,
               let id = selectedLayerIDs.first,
@@ -418,6 +427,8 @@ final class CanvasNSView: NSView {
                           width: layer.size.width, height: layer.size.height)
         let handleSize: CGFloat = 7
         let halfH = handleSize / 2 + 3  // generous hit zone
+
+        // Corner handles
         let corners: [(CGPoint, ResizeCorner)] = [
             (CGPoint(x: rect.minX, y: rect.minY), .topLeft),
             (CGPoint(x: rect.maxX, y: rect.minY), .topRight),
@@ -428,6 +439,20 @@ final class CanvasNSView: NSView {
             let hitRect = CGRect(x: pt.x - halfH, y: pt.y - halfH,
                                  width: halfH*2, height: halfH*2)
             if hitRect.contains(point) { return (layer, corner) }
+        }
+
+        // Edge midpoint handles
+        let edgeHalfH: CGFloat = 5
+        let edges: [(CGPoint, ResizeCorner)] = [
+            (CGPoint(x: rect.midX, y: rect.minY), .top),
+            (CGPoint(x: rect.midX, y: rect.maxY), .bottom),
+            (CGPoint(x: rect.minX, y: rect.midY), .left),
+            (CGPoint(x: rect.maxX, y: rect.midY), .right),
+        ]
+        for (pt, edge) in edges {
+            let hitRect = CGRect(x: pt.x - edgeHalfH, y: pt.y - edgeHalfH,
+                                 width: edgeHalfH*2, height: edgeHalfH*2)
+            if hitRect.contains(point) { return (layer, edge) }
         }
         return nil
     }
@@ -480,6 +505,10 @@ final class CanvasNSView: NSView {
             case .topRight:    resizeOppositeCorner = CGPoint(x: rect.minX, y: rect.maxY)
             case .bottomLeft:  resizeOppositeCorner = CGPoint(x: rect.maxX, y: rect.minY)
             case .bottomRight: resizeOppositeCorner = CGPoint(x: rect.minX, y: rect.minY)
+            case .top:         resizeOppositeCorner = CGPoint(x: rect.midX, y: rect.maxY)
+            case .bottom:      resizeOppositeCorner = CGPoint(x: rect.midX, y: rect.minY)
+            case .left:        resizeOppositeCorner = CGPoint(x: rect.maxX, y: rect.midY)
+            case .right:       resizeOppositeCorner = CGPoint(x: rect.minX, y: rect.midY)
             }
             Logger.debug("mouseDown: resize start, corner=\(corner), anchor=\(resizeOppositeCorner)")
             return
@@ -517,20 +546,53 @@ final class CanvasNSView: NSView {
             project = proj
             needsDisplay = true
 
-        case .resizing:
+        case .resizing(let corner):
             guard let id = selectedLayerIDs.first,
                   var proj = project,
                   let index = proj.layers.firstIndex(where: { $0.id == id }) else { return }
             let anchor = resizeOppositeCorner
 
-            // Compute new size: distance from anchor corner to mouse is the new dimension
-            let newW = abs(point.x - anchor.x)
-            let newH = newW / resizeAspectRatio
-            let newSize = CGSize(width: max(newW, 20), height: max(newH, 20))
+            let newSize: CGSize
+            let newCenter: CGPoint
 
-            // New position: midpoint between anchor and the dragged corner
-            let newCenter = CGPoint(x: (anchor.x + point.x) / 2,
+            switch corner {
+            case .top, .bottom, .left, .right:
+                // Edge resize: free-axis, no aspect ratio lock.
+                // Constrain to the axis being dragged.
+                var w = proj.layers[index].size.width
+                var h = proj.layers[index].size.height
+                var cx = proj.layers[index].position.x
+                var cy = proj.layers[index].position.y
+                switch corner {
+                case .top:
+                    h = max(anchor.y - point.y, 20)
+                    cy = (anchor.y + point.y) / 2
+                    cx = anchor.x
+                case .bottom:
+                    h = max(point.y - anchor.y, 20)
+                    cy = (anchor.y + point.y) / 2
+                    cx = anchor.x
+                case .left:
+                    w = max(anchor.x - point.x, 20)
+                    cx = (anchor.x + point.x) / 2
+                    cy = anchor.y
+                case .right:
+                    w = max(point.x - anchor.x, 20)
+                    cx = (anchor.x + point.x) / 2
+                    cy = anchor.y
+                default: break
+                }
+                newSize = CGSize(width: max(w, 20), height: max(h, 20))
+                newCenter = CGPoint(x: cx, y: cy)
+
+            case .topLeft, .topRight, .bottomLeft, .bottomRight:
+                // Corner resize: aspect-ratio locked, uniform scale.
+                let newW = abs(point.x - anchor.x)
+                let newH = newW / resizeAspectRatio
+                newSize = CGSize(width: max(newW, 20), height: max(newH, 20))
+                newCenter = CGPoint(x: (anchor.x + point.x) / 2,
                                     y: (anchor.y + point.y) / 2)
+            }
 
             proj.layers[index].size = newSize
             proj.layers[index].position = newCenter

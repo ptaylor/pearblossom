@@ -172,27 +172,12 @@ struct CanvasView: NSViewRepresentable {
 
             Logger.debug("handleDrop: \(paths.count) file(s), dropPoint=\(point), canvasSize=\(canvasSize), targetDim=\(targetDim) (scalePercent=\(scalePercent)), maxZ=\(maxZ)")
 
-            for (index, path) in paths.enumerated() {
+            for path in paths {
                 // Source image point size (NSImage)
                 let nsImage = NSImage(contentsOfFile: path)
                 let nsImageSize = nsImage?.size ?? .zero
-                let nsImageRep = nsImage?.representations.first
-                let pixelSize: CGSize = {
-                    if let rep = nsImageRep {
-                        return CGSize(width: CGFloat(rep.pixelsWide), height: CGFloat(rep.pixelsHigh))
-                    }
-                    return nsImageSize
-                }()
 
-                // CIImage extent (actual pixel dimensions from the file)
-                let ciExtent: CGSize = {
-                    if let img = CIImage(contentsOf: URL(fileURLWithPath: path), options: [.applyOrientationProperty: true]) {
-                        return img.extent.size
-                    }
-                    return .zero
-                }()
-
-                // Use NSImage.size for sourceResolution (matches current behavior)
+                // Use NSImage.size for sourceResolution
                 let sourceSize = nsImageSize
                 let scale = sourceSize.width > 0
                     ? min(targetDim / sourceSize.width, targetDim / sourceSize.height)
@@ -201,17 +186,9 @@ struct CanvasView: NSViewRepresentable {
 
                 // Position: center of the placed layer
                 let centerPos = CGPoint(x: point.x + cascadeOffset, y: point.y + cascadeOffset)
-                // Top-left corner (in flipped canvas coords, where y increases downward)
-                let topLeft = CGPoint(x: centerPos.x - displaySize.width / 2,
-                                      y: centerPos.y - displaySize.height / 2)
 
                 // Store relative path if photo is inside the Pearblossom root directory
                 let storedPath = relativePath(from: path)
-
-                Logger.debug("handleDrop: file[\(index)] path=\(path) storedPath=\(storedPath)")
-                Logger.debug("handleDrop: file[\(index)] nsImageSize(points)=\(nsImageSize) pixelSize(w×h)=\(pixelSize) ciExtent(pixels)=\(ciExtent)")
-                Logger.debug("handleDrop: file[\(index)] sourceResolution(used)=\(sourceSize) scale=\(scale) displaySize=\(displaySize)")
-                Logger.debug("handleDrop: file[\(index)] centerPos=\(centerPos) topLeft=\(topLeft) cascadeOffset=\(cascadeOffset)")
 
                 let layer = PhotoLayer(
                     photoPath: storedPath,

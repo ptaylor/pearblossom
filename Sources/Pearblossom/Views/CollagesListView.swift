@@ -208,6 +208,11 @@ struct CollagesListView: View {
                     }
                 )
                 .contentShape(Rectangle())
+                .listRowBackground(
+                    selectedCollageID == collage.id
+                        ? Color.accentColor.opacity(0.12)
+                        : Color.clear
+                )
                 .onTapGesture {
                     selectedCollageID = collage.id
                     selectedProject = collage

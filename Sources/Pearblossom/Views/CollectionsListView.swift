@@ -257,6 +257,11 @@ struct CollectionsListView: View {
                     }
                 )
                 .contentShape(Rectangle())
+                .listRowBackground(
+                    selectedCollectionID == collection.id
+                        ? Color.accentColor.opacity(0.12)
+                        : Color.clear
+                )
                 .onTapGesture {
                     selectedCollectionID = collection.id
                     withAnimation(.easeInOut(duration: 0.15)) {
