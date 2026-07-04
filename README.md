@@ -1,7 +1,7 @@
 # Pearblossom
 
 <p align="center">
-  <img src="PearblossomLogo.svg" alt="Pearblossom logo" width="200">
+  <img src="Sources/Pearblossom/Resources/PearblossomLogo.svg" alt="Pearblossom logo" width="200">
 </p>
 
 A native macOS desktop app for creating photo collages inspired by David Hockney's "Joiners" — composite images made from overlapping, freeform-arranged photographs. Named after Hockney's iconic photomontage *Pearblossom Highway*.
