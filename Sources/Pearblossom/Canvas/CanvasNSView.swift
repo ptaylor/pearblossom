@@ -184,6 +184,41 @@ final class CanvasNSView: NSView {
                 y: canvasH - layer.position.y - halfH
             ))
 
+            // Drop shadow — composite a blurred, offset silhouette before the layer
+            if layer.shadowRadius > 0 {
+                var shadow = t
+
+                // Make the shadow a dark silhouette (preserving alpha shape)
+                let colorMat = CIFilter(name: "CIColorMatrix")!
+                colorMat.setValue(shadow, forKey: kCIInputImageKey)
+                colorMat.setValue(CIVector(x: 0, y: 0, z: 0, w: 0), forKey: "inputRVector")
+                colorMat.setValue(CIVector(x: 0, y: 0, z: 0, w: 0), forKey: "inputGVector")
+                colorMat.setValue(CIVector(x: 0, y: 0, z: 0, w: 0), forKey: "inputBVector")
+                colorMat.setValue(CIVector(x: 0, y: 0, z: 0, w: 0.4), forKey: "inputAVector")
+                shadow = colorMat.outputImage ?? shadow
+
+                // Gaussian blur for soft shadow edge
+                let blur = CIFilter(name: "CIGaussianBlur")!
+                blur.setValue(shadow, forKey: kCIInputImageKey)
+                blur.setValue(layer.shadowRadius, forKey: kCIInputRadiusKey)
+                shadow = blur.outputImage ?? shadow
+
+                // Offset shadow down and right
+                let offsetX: CGFloat = 4
+                let offsetY: CGFloat = -4
+                shadow = shadow.transformed(by: CGAffineTransform(translationX: offsetX, y: offsetY))
+
+                // Composite shadow under everything
+                if let existing = composite {
+                    let f = CIFilter(name: "CISourceOverCompositing")!
+                    f.setValue(shadow, forKey: kCIInputImageKey)
+                    f.setValue(existing, forKey: kCIInputBackgroundImageKey)
+                    composite = f.outputImage
+                } else {
+                    composite = shadow
+                }
+            }
+
             // Opacity
             if layer.opacity < 1.0 {
                 let f = CIFilter(name: "CIColorMatrix")!
@@ -192,7 +227,7 @@ final class CanvasNSView: NSView {
                 t = f.outputImage ?? t
             }
 
-            // Composite
+            // Composite layer over background (and any preceding shadow)
             if let existing = composite {
                 let f = CIFilter(name: "CISourceOverCompositing")!
                 f.setValue(t, forKey: kCIInputImageKey)

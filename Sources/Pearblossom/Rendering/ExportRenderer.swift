@@ -190,6 +190,39 @@ enum ExportRenderer {
 
             t = t.transformed(by: CGAffineTransform(translationX: exportX, y: exportY))
 
+            // Drop shadow — composite a blurred, offset silhouette before the layer
+            if layer.shadowRadius > 0 {
+                var shadow = t
+
+                // Make the shadow a dark silhouette (preserving alpha shape)
+                let colorMat = CIFilter(name: "CIColorMatrix")!
+                colorMat.setValue(shadow, forKey: kCIInputImageKey)
+                colorMat.setValue(CIVector(x: 0, y: 0, z: 0, w: 0), forKey: "inputRVector")
+                colorMat.setValue(CIVector(x: 0, y: 0, z: 0, w: 0), forKey: "inputGVector")
+                colorMat.setValue(CIVector(x: 0, y: 0, z: 0, w: 0), forKey: "inputBVector")
+                colorMat.setValue(CIVector(x: 0, y: 0, z: 0, w: 0.4), forKey: "inputAVector")
+                shadow = colorMat.outputImage ?? shadow
+
+                // Gaussian blur — scale radius to export resolution
+                let blur = CIFilter(name: "CIGaussianBlur")!
+                blur.setValue(shadow, forKey: kCIInputImageKey)
+                blur.setValue(layer.shadowRadius * scaleX, forKey: kCIInputRadiusKey)
+                shadow = blur.outputImage ?? shadow
+
+                // Offset shadow — scaled to export resolution
+                let offsetX: CGFloat = 4 * scaleX
+                let offsetY: CGFloat = -4 * scaleY
+                shadow = shadow.transformed(by: CGAffineTransform(translationX: offsetX, y: offsetY))
+
+                // Composite shadow under everything
+                let sf = CIFilter(name: "CISourceOverCompositing")!
+                sf.setValue(shadow, forKey: kCIInputImageKey)
+                sf.setValue(composite, forKey: kCIInputBackgroundImageKey)
+                if let result = sf.outputImage {
+                    composite = result
+                }
+            }
+
             // Opacity
             if layer.opacity < 1.0 {
                 let f = CIFilter(name: "CIColorMatrix")!

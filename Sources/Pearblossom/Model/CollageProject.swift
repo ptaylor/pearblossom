@@ -182,10 +182,12 @@ struct PhotoLayer: Codable, Identifiable {
     var cropRect: CGRect? = nil
     var featherRadius: CGFloat? = nil
     var blendMode: String? = nil
+    var shadowRadius: CGFloat = 0
 
     enum CodingKeys: String, CodingKey {
         case id, collectionID, photoID, position, size, rotation, zOrder, opacity
         case sourceResolution, cropRect, featherRadius, blendMode
+        case shadowRadius
     }
 
     /// Resolves the photo's absolute file path from its collection reference.

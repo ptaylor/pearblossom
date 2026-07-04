@@ -25,6 +25,8 @@ struct InspectorView: View {
                         Divider()
                         boundingBoxSection(binding)
                         Divider()
+                        shadowSection(binding)
+                        Divider()
                     }
 
                     zoomSection()
@@ -156,6 +158,51 @@ struct InspectorView: View {
                     binding.wrappedValue.modifiedAt = Date()
                 }
         }
+    }
+
+    // MARK: - Shadow Section
+
+    private func shadowSection(_ binding: Binding<CollageProject>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Shadow")
+                .font(.headline)
+
+            let commonRadius = commonShadowRadius(binding.wrappedValue)
+
+            HStack {
+                Text("Radius:")
+                    .font(.body)
+                Slider(value: Binding<CGFloat>(
+                    get: { commonRadius },
+                    set: { newValue in
+                        binding.wrappedValue.layers.indices.forEach { i in
+                            binding.wrappedValue.layers[i].shadowRadius = newValue
+                        }
+                        binding.wrappedValue.modifiedAt = Date()
+                    }
+                ), in: 0...30, step: 1)
+                Text("\(Int(commonRadius)) px")
+                    .font(.body)
+                    .monospacedDigit()
+                    .foregroundColor(.secondary)
+                    .frame(width: 36, alignment: .trailing)
+            }
+
+            if commonRadius > 0 {
+                Text("Drop shadows increase the rendered bounds of each image.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+    }
+
+    /// Returns the most common shadowRadius across all layers (mode), or 0 if none.
+    private func commonShadowRadius(_ project: CollageProject) -> CGFloat {
+        guard !project.layers.isEmpty else { return 0 }
+        let radii = project.layers.map { $0.shadowRadius }
+        // Find the most frequent value
+        let grouped = Dictionary(grouping: radii, by: { $0 })
+        return grouped.max(by: { $0.value.count < $1.value.count })?.key ?? 0
     }
 
     // MARK: - Zoom Section
