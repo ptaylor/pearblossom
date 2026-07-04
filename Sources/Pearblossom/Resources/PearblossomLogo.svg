@@ -10,31 +10,31 @@
   <polygon points="246,230 266,230 216,135 202,138" fill="#FFCC80"/>
   <polygon points="246,230 266,230 340,130 326,133" fill="#FFCC80"/>
 
-  <!-- Canopy — pastel-green photo-rect leaves forming a natural tree silhouette -->
+  <!-- Canopy — pastel-green photo-rect leaves, spread vertically for full tree shape -->
   <!-- LHS leaves lean left, RHS lean right, center nearly straight -->
 
-  <!-- Left branch leaves — rotated counter-clockwise to fan outward -->
-  <rect x="108" y="155" width="72" height="52" rx="6" fill="#A5D6A7" transform="rotate(-32, 144, 181)"/>
-  <rect x="92" y="200" width="64" height="46" rx="6" fill="#C5E1A5" transform="rotate(-28, 124, 223)"/>
-  <rect x="128" y="128" width="60" height="44" rx="6" fill="#B5E8C3" transform="rotate(-26, 158, 150)"/>
-  <rect x="70" y="225" width="60" height="44" rx="6" fill="#DCEDC8" transform="rotate(-36, 100, 247)"/>
-  <rect x="146" y="198" width="54" height="38" rx="6" fill="#C8E6C9" transform="rotate(-30, 173, 217)"/>
-  <rect x="115" y="175" width="50" height="36" rx="6" fill="#B9F6CA" transform="rotate(-24, 140, 193)"/>
+  <!-- Center / top leaves — crown reaching upward -->
+  <rect x="203" y="68" width="74" height="54" rx="6" fill="#DCEDC8" transform="rotate(-4, 240, 95)"/>
+  <rect x="210" y="95" width="48" height="34" rx="6" fill="#B5E8C3" transform="rotate(-5, 234, 112)"/>
+  <rect x="183" y="120" width="54" height="40" rx="6" fill="#B9F6CA" transform="rotate(-8, 210, 140)"/>
+  <rect x="223" y="115" width="60" height="44" rx="6" fill="#C8E6C9" transform="rotate(5, 253, 137)"/>
+  <rect x="248" y="140" width="50" height="36" rx="6" fill="#A5D6A7" transform="rotate(3, 273, 158)"/>
 
-  <!-- Right branch leaves — rotated clockwise to fan outward -->
-  <rect x="338" y="150" width="72" height="52" rx="6" fill="#C5E1A5" transform="rotate(32, 374, 176)"/>
-  <rect x="352" y="190" width="64" height="46" rx="6" fill="#B5E8C3" transform="rotate(28, 384, 213)"/>
-  <rect x="318" y="123" width="60" height="44" rx="6" fill="#A5D6A7" transform="rotate(26, 348, 145)"/>
-  <rect x="363" y="220" width="60" height="44" rx="6" fill="#C8E6C9" transform="rotate(36, 393, 242)"/>
-  <rect x="298" y="192" width="54" height="38" rx="6" fill="#DCEDC8" transform="rotate(30, 325, 211)"/>
-  <rect x="340" y="170" width="50" height="36" rx="6" fill="#B9F6CA" transform="rotate(24, 365, 188)"/>
+  <!-- Left branch leaves — rotated counter-clockwise, spread vertically outward -->
+  <rect x="128" y="78" width="60" height="44" rx="6" fill="#B5E8C3" transform="rotate(-26, 158, 100)"/>
+  <rect x="108" y="110" width="72" height="52" rx="6" fill="#A5D6A7" transform="rotate(-32, 144, 136)"/>
+  <rect x="115" y="140" width="50" height="36" rx="6" fill="#B9F6CA" transform="rotate(-24, 140, 158)"/>
+  <rect x="146" y="170" width="54" height="38" rx="6" fill="#C8E6C9" transform="rotate(-30, 173, 189)"/>
+  <rect x="92" y="180" width="64" height="46" rx="6" fill="#C5E1A5" transform="rotate(-28, 124, 203)"/>
+  <rect x="70" y="215" width="60" height="44" rx="6" fill="#DCEDC8" transform="rotate(-36, 100, 237)"/>
 
-  <!-- Center / top leaves — nearly vertical, mild angles -->
-  <rect x="203" y="118" width="74" height="54" rx="6" fill="#DCEDC8" transform="rotate(-4, 240, 145)"/>
-  <rect x="223" y="150" width="60" height="44" rx="6" fill="#C8E6C9" transform="rotate(5, 253, 172)"/>
-  <rect x="183" y="155" width="54" height="40" rx="6" fill="#B9F6CA" transform="rotate(-8, 210, 175)"/>
-  <rect x="248" y="168" width="50" height="36" rx="6" fill="#A5D6A7" transform="rotate(3, 273, 186)"/>
-  <rect x="210" y="140" width="48" height="34" rx="6" fill="#B5E8C3" transform="rotate(-5, 234, 157)"/>
+  <!-- Right branch leaves — rotated clockwise, spread vertically outward -->
+  <rect x="318" y="73" width="60" height="44" rx="6" fill="#A5D6A7" transform="rotate(26, 348, 95)"/>
+  <rect x="338" y="105" width="72" height="52" rx="6" fill="#C5E1A5" transform="rotate(32, 374, 131)"/>
+  <rect x="340" y="135" width="50" height="36" rx="6" fill="#B9F6CA" transform="rotate(24, 365, 153)"/>
+  <rect x="298" y="165" width="54" height="38" rx="6" fill="#DCEDC8" transform="rotate(30, 325, 184)"/>
+  <rect x="352" y="175" width="64" height="46" rx="6" fill="#B5E8C3" transform="rotate(28, 384, 198)"/>
+  <rect x="363" y="210" width="60" height="44" rx="6" fill="#C8E6C9" transform="rotate(36, 393, 232)"/>
 
   <!-- App name — pastel orange -->
   <text x="256" y="490" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="22" font-weight="300" letter-spacing="12" fill="#E8945A">pearblossom</text>
