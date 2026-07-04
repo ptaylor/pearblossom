@@ -3,36 +3,41 @@
   <!-- Pastel azure blue background -->
   <rect x="0" y="0" width="512" height="512" fill="#A8D8EA"/>
 
-  <!-- Tree group — scaled ~2x about (256, 300) for dramatic full-bleed effect -->
-  <g transform="translate(256,300) scale(1.8) translate(-256,-300)">
-    <!-- Tapered trunk — pastel orange -->
-    <polygon points="240,440 272,440 266,280 246,280" fill="#FFCC80"/>
-    <!-- Y-split branches — pastel orange -->
-    <polygon points="246,280 266,280 216,185 202,188" fill="#FFCC80"/>
-    <polygon points="246,280 266,280 340,180 326,183" fill="#FFCC80"/>
+  <!-- Tapered trunk — pastel orange, shifted up to start above text -->
+  <polygon points="240,390 272,390 266,230 246,230" fill="#FFCC80"/>
 
-    <!-- Canopy — photo rectangles as leaves, pastel greens / yellows / pinks -->
-    <!-- Left branch -->
-    <rect x="115" y="140" width="62" height="44" rx="5" fill="#B9F6CA" transform="rotate(-18, 146, 162)"/>
-    <rect x="105" y="180" width="56" height="40" rx="5" fill="#FFF5BA" transform="rotate(10, 133, 200)"/>
-    <rect x="145" y="105" width="52" height="38" rx="5" fill="#F8BBD0" transform="rotate(-8, 171, 124)"/>
-    <rect x="90" y="210" width="48" height="34" rx="5" fill="#A5D6A7" transform="rotate(24, 114, 227)"/>
-    <rect x="165" y="185" width="44" height="30" rx="5" fill="#FFE59A" transform="rotate(-14, 187, 200)"/>
+  <!-- Y-split branches — pastel orange -->
+  <polygon points="246,230 266,230 216,135 202,138" fill="#FFCC80"/>
+  <polygon points="246,230 266,230 340,130 326,133" fill="#FFCC80"/>
 
-    <!-- Right branch -->
-    <rect x="340" y="135" width="62" height="44" rx="5" fill="#FFF5BA" transform="rotate(20, 371, 157)"/>
-    <rect x="358" y="175" width="56" height="40" rx="5" fill="#FFD1DC" transform="rotate(-10, 386, 195)"/>
-    <rect x="318" y="105" width="52" height="38" rx="5" fill="#B5E8C3" transform="rotate(10, 344, 124)"/>
-    <rect x="375" y="210" width="48" height="34" rx="5" fill="#FFE59A" transform="rotate(-24, 399, 227)"/>
-    <rect x="305" y="182" width="44" height="30" rx="5" fill="#A5D6A7" transform="rotate(15, 327, 197)"/>
+  <!-- Canopy — larger photo-rect leaves clustered around the branches -->
+  <!-- Pastel greens: #B9F6CA #A5D6A7 #C8E6C9 #B5E8C3 -->
+  <!-- Pastel yellows: #FFF5BA #FFE59A -->
+  <!-- Pastel pinks: #F8BBD0 #FFD1DC -->
 
-    <!-- Top / center -->
-    <rect x="202" y="75" width="66" height="48" rx="5" fill="#C8E6C9" transform="rotate(-4, 235, 99)"/>
-    <rect x="225" y="115" width="52" height="38" rx="5" fill="#F8BBD0" transform="rotate(12, 251, 134)"/>
-    <rect x="185" y="118" width="46" height="32" rx="5" fill="#B9F6CA" transform="rotate(-16, 208, 134)"/>
-    <rect x="250" y="145" width="42" height="30" rx="5" fill="#FFF5BA" transform="rotate(-6, 271, 160)"/>
-  </g>
+  <!-- Left branch leaves (branch ~256,230 to ~209,136) -->
+  <rect x="108" y="155" width="72" height="52" rx="6" fill="#B9F6CA" transform="rotate(-18, 144, 181)"/>
+  <rect x="92" y="200" width="64" height="46" rx="6" fill="#FFF5BA" transform="rotate(10, 124, 223)"/>
+  <rect x="128" y="128" width="60" height="44" rx="6" fill="#F8BBD0" transform="rotate(-8, 158, 150)"/>
+  <rect x="70" y="225" width="60" height="44" rx="6" fill="#A5D6A7" transform="rotate(24, 100, 247)"/>
+  <rect x="146" y="198" width="54" height="38" rx="6" fill="#FFE59A" transform="rotate(-14, 173, 217)"/>
+  <rect x="115" y="175" width="50" height="36" rx="6" fill="#C8E6C9" transform="rotate(6, 140, 193)"/>
 
-  <!-- App name -->
-  <text x="256" y="488" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="22" font-weight="300" letter-spacing="12" fill="#5C7A8A">pearblossom</text>
+  <!-- Right branch leaves (branch ~256,230 to ~333,131) -->
+  <rect x="338" y="150" width="72" height="52" rx="6" fill="#FFF5BA" transform="rotate(20, 374, 176)"/>
+  <rect x="352" y="190" width="64" height="46" rx="6" fill="#FFD1DC" transform="rotate(-10, 384, 213)"/>
+  <rect x="318" y="123" width="60" height="44" rx="6" fill="#B5E8C3" transform="rotate(10, 348, 145)"/>
+  <rect x="363" y="220" width="60" height="44" rx="6" fill="#FFE59A" transform="rotate(-24, 393, 242)"/>
+  <rect x="298" y="192" width="54" height="38" rx="6" fill="#A5D6A7" transform="rotate(15, 325, 211)"/>
+  <rect x="340" y="170" width="50" height="36" rx="6" fill="#F8BBD0" transform="rotate(-6, 365, 188)"/>
+
+  <!-- Center / top leaves (above the Y-split at ~256,230) -->
+  <rect x="203" y="118" width="74" height="54" rx="6" fill="#C8E6C9" transform="rotate(-4, 240, 145)"/>
+  <rect x="223" y="150" width="60" height="44" rx="6" fill="#F8BBD0" transform="rotate(12, 253, 172)"/>
+  <rect x="183" y="155" width="54" height="40" rx="6" fill="#B9F6CA" transform="rotate(-16, 210, 175)"/>
+  <rect x="248" y="168" width="50" height="36" rx="6" fill="#FFF5BA" transform="rotate(-6, 273, 186)"/>
+  <rect x="210" y="140" width="48" height="34" rx="6" fill="#FFD1DC" transform="rotate(8, 234, 157)"/>
+
+  <!-- App name — pastel orange -->
+  <text x="256" y="490" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="22" font-weight="300" letter-spacing="12" fill="#E8945A">pearblossom</text>
 </svg>
