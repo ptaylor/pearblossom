@@ -16,10 +16,6 @@ Individual artworks — including David Hockney's *Pearblossom Hwy., 11 - 18th A
 
 "Pearblossom" is used as the name of this open-source software project. This project makes no claim to any trademark rights held by others. All trademarks and registered trademarks mentioned in this project are the property of their respective owners.
 
-## Project Name
-
-The name "Pearblossom" refers to the pear tree (*Pyrus*) blossom and is also the name of a census-designated place in Los Angeles County, California. The project name was chosen for its botanical and geographical associations. Any similarity to titles of artistic or literary works is incidental.
-
 ## Licensing
 
 This software is licensed under the terms found in the [`LICENSE`](LICENSE) file. The license governs use of the software code only and does not grant any rights to third-party trademarks, artworks, or intellectual property referenced in documentation.
