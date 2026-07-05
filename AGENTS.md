@@ -4,7 +4,9 @@ This file provides instructions and conventions for LLM coding assistants workin
 
 ## Project
 
-A macOS desktop app for creating photo collages in the style of David Hockney's "Joiners" — overlapping, misaligned photographs that form a composite image. Working title: **Pearblossom**.
+A macOS desktop app for creating multi-perspective photo collages — overlapping, freeform-arranged photographs that form a composite image. Working title: **Pearblossom**.
+
+**Legal note:** Do not reference David Hockney, "joiners" as a branded term, or the artwork *Pearblossom Highway* in generated code, comments, or documentation. The project name Pearblossom refers to the pear blossom and California geography. Use neutral descriptions: "photo-collage tool," "multi-perspective collage," or "composite-image builder." See [`LEGAL.md`](LEGAL.md).
 
 ## Architecture Reference
 
