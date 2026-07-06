@@ -25,21 +25,17 @@ struct ContentView: View {
     var body: some View {
         Group {
             if isReady {
-                NavigationSplitView {
+                HSplitView {
             SidebarView(selectedProject: $state.project)
-                .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 350)
-                .frame(minWidth: 220)
-        } content: {
+                .frame(minWidth: 220, idealWidth: 250, maxWidth: 350)
             CanvasView(project: $state.project, magnification: $canvasMagnification)
                 .frame(minWidth: 600)
                 .onDrop(of: [.plainText, .fileURL], isTargeted: nil) { providers, _ in
                     handleCanvasDrop(providers: providers)
                     return true
                 }
-        } detail: {
             InspectorView(project: $state.project, magnification: $canvasMagnification)
-                .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 350)
-                .frame(minWidth: 220)
+                .frame(minWidth: 220, idealWidth: 260, maxWidth: 350)
         }
         .onChange(of: state.project?.id) { _, _ in updateWindowTitle() }
         .onChange(of: state.project?.name) { _, _ in updateWindowTitle() }
