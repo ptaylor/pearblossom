@@ -25,9 +25,9 @@ echo "==> Generating AppIcon.icns from $SVG_PATH"
 # Step 1: Render SVG to 1024x1024 PNG
 echo "  [1/3] Rendering SVG to 1024×1024 PNG..."
 if command -v magick &>/dev/null; then
-    magick -size 1024x1024 "$SVG_PATH" "$BASE_PNG"
+    magick -density 144 -background none "$SVG_PATH" -resize 1024x1024 "$BASE_PNG"
 elif command -v convert &>/dev/null; then
-    convert -size 1024x1024 "$SVG_PATH" "$BASE_PNG"
+    convert -density 144 -background none "$SVG_PATH" -resize 1024x1024 "$BASE_PNG"
 else
     echo "ERROR: ImageMagick not found. Install it with: brew install imagemagick"
     exit 1
