@@ -65,6 +65,16 @@ struct ExportSettingsView: View {
         !project.layers.isEmpty
     }
 
+    /// True when the selected export format cannot represent the canvas background.
+    private var formatCannotRepresentBackground: Bool {
+        project.backgroundColor.isTransparent && selectedFormat == .jpeg
+    }
+
+    /// Whether the export button should be disabled.
+    private var exportDisabled: Bool {
+        !hasLayers || isExporting || formatCannotRepresentBackground
+    }
+
     var body: some View {
         VStack(spacing: 20) {
             Text("Export Collage")
@@ -143,6 +153,17 @@ struct ExportSettingsView: View {
                     .foregroundColor(.secondary)
             }
 
+            if formatCannotRepresentBackground {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundColor(.orange)
+                    Text("JPEG does not support transparency. Switch to PNG to preserve the transparent background, or choose an opaque background on the canvas.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+
             if let error = exportError {
                 Text(error)
                     .font(.caption)
@@ -176,7 +197,7 @@ struct ExportSettingsView: View {
                     performExport()
                 }
                 .keyboardShortcut(.return)
-                .disabled(!hasLayers || isExporting)
+                .disabled(exportDisabled)
             }
             .padding(.top, 8)
 
@@ -214,6 +235,11 @@ struct ExportSettingsView: View {
 
     private func performExport() {
         guard hasLayers else { return }
+        guard !formatCannotRepresentBackground else {
+            exportError = "JPEG does not support transparency. Please switch to PNG or choose an opaque background."
+            Logger.warn("ExportSettingsView: blocked JPEG export with transparent background")
+            return
+        }
 
         isExporting = true
         exportError = nil

@@ -70,6 +70,7 @@ struct InspectorView: View {
                     let isSelected = binding.wrappedValue.backgroundColor.red == preset.red
                         && binding.wrappedValue.backgroundColor.green == preset.green
                         && binding.wrappedValue.backgroundColor.blue == preset.blue
+                        && !binding.wrappedValue.backgroundColor.isTransparent
 
                     Button {
                         binding.wrappedValue.backgroundColor = preset
@@ -90,6 +91,37 @@ struct InspectorView: View {
                     .buttonStyle(.plain)
                     .help(presetLabel(preset))
                 }
+
+                // Transparent / checkerboard option
+                let isTransparent = binding.wrappedValue.backgroundColor.isTransparent
+                Button {
+                    binding.wrappedValue.backgroundColor = .transparent
+                    binding.wrappedValue.modifiedAt = Date()
+                } label: {
+                    Canvas { context, size in
+                        let tileCount = 6
+                        let tileW = size.width / CGFloat(tileCount)
+                        let tileH = size.height / CGFloat(tileCount)
+                        for row in 0..<tileCount {
+                            for col in 0..<tileCount {
+                                let isWhite = (row + col) % 2 == 0
+                                let color: Color = isWhite ? .white : Color(NSColor(white: 0.82, alpha: 1.0))
+                                let rect = CGRect(
+                                    x: CGFloat(col) * tileW, y: CGFloat(row) * tileH,
+                                    width: tileW + 1, height: tileH + 1)
+                                context.fill(Path(rect), with: .color(color))
+                            }
+                        }
+                    }
+                    .aspectRatio(1, contentMode: .fit)
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4)
+                            .stroke(isTransparent ? Color.accentColor : Color.gray.opacity(0.3), lineWidth: isTransparent ? 3 : 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                .help("Transparent")
             }
         }
     }

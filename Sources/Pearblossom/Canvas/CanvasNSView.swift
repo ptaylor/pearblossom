@@ -1,5 +1,6 @@
 import AppKit
 import CoreImage
+import Combine
 
 /// The AppKit NSView that renders the collage canvas with drag-drop, CIImage compositing,
 /// layer selection, move, and delete support.
@@ -12,16 +13,30 @@ final class CanvasNSView: NSView {
     private var cachedCompositeExtent: CGRect = .zero  // Position of cached composite in CIImage space
     private var sourceImageCache: [UUID: CIImage] = [:]  // Cache loaded source images
     private var isDragging = false  // Skip full rebuild during drag
+    private var projectObserver: AnyCancellable?
 
     var project: CollageProject? {
         didSet {
-            guard project !== oldValue else { return }  // Same instance, skip reset
+            guard project !== oldValue else { return }  // Same instance, skip full reset
             cachedComposite = nil
             cachedCompositeExtent = .zero
             selectedLayerIDs = []
             sourceImageCache = [:]
             interactionMode = .none
             needsDisplay = true
+            subscribeToProjectChanges()
+        }
+    }
+
+    /// Observes @Published changes on the current project so the canvas
+    /// redraws when properties like backgroundColor change via the inspector.
+    private func subscribeToProjectChanges() {
+        projectObserver = project?.objectWillChange.sink { [weak self] _ in
+            DispatchQueue.main.async {
+                self?.cachedComposite = nil
+                self?.cachedCompositeExtent = .zero
+                self?.needsDisplay = true
+            }
         }
     }
 
@@ -84,7 +99,9 @@ final class CanvasNSView: NSView {
         guard let cgContext = NSGraphicsContext.current?.cgContext else { return }
 
         if let proj = project, !proj.layers.isEmpty {
-            if proj.showBoundingBox {
+            if proj.backgroundColor.isTransparent {
+                drawCheckerboard(in: cgContext, rect: bounds)
+            } else if proj.showBoundingBox {
                 // Normal mode: entire canvas uses the background color
                 cgContext.setFillColor(currentBackground)
                 cgContext.fill(bounds)
@@ -105,8 +122,12 @@ final class CanvasNSView: NSView {
             }
         } else if let proj = project {
             // No layers: fill entire canvas with background
-            cgContext.setFillColor(currentBackground)
-            cgContext.fill(bounds)
+            if proj.backgroundColor.isTransparent {
+                drawCheckerboard(in: cgContext, rect: bounds)
+            } else {
+                cgContext.setFillColor(currentBackground)
+                cgContext.fill(bounds)
+            }
             if proj.showBoundingBox {
                 drawBoundingBox(proj.effectiveBoundingBox(), on: currentBackground, in: cgContext)
             }
@@ -861,6 +882,33 @@ final class CanvasNSView: NSView {
         let dropPoint = convert(mouseWindow, from: nil)
         onPhotosDropped?(paths, dropPoint, nil, [])
         return true
+    }
+
+    // MARK: - Checkerboard Background
+
+    /// Draws a checkerboard pattern in the given rect to indicate transparency.
+    /// Uses two light grey tones so the pattern is subtle but visible.
+    private func drawCheckerboard(in context: CGContext, rect: CGRect) {
+        let tileSize: CGFloat = 16
+        let cols = Int(ceil(rect.width / tileSize))
+        let rows = Int(ceil(rect.height / tileSize))
+
+        let lightColor = CGColor(red: 0.95, green: 0.95, blue: 0.95, alpha: 1.0)
+        let midColor   = CGColor(red: 0.82, green: 0.82, blue: 0.82, alpha: 1.0)
+
+        for row in 0..<rows {
+            for col in 0..<cols {
+                let isLight = (row + col) % 2 == 0
+                context.setFillColor(isLight ? lightColor : midColor)
+                let tileRect = CGRect(
+                    x: rect.origin.x + CGFloat(col) * tileSize,
+                    y: rect.origin.y + CGFloat(row) * tileSize,
+                    width: tileSize,
+                    height: tileSize
+                ).intersection(rect)
+                context.fill(tileRect)
+            }
+        }
     }
 
     override var isFlipped: Bool { true }

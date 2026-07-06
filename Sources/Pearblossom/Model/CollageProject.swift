@@ -252,6 +252,7 @@ struct CodableColor: Codable {
 
     static let white = CodableColor(red: 1, green: 1, blue: 1, alpha: 1)
     static let black = CodableColor(red: 0, green: 0, blue: 0, alpha: 1)
+    static let transparent = CodableColor(red: 0, green: 0, blue: 0, alpha: 0)
 
     init(red: CGFloat, green: CGFloat, blue: CGFloat, alpha: CGFloat) {
         self.red = red
@@ -271,6 +272,9 @@ struct CodableColor: Codable {
     var cgColor: CGColor {
         CGColor(red: red, green: green, blue: blue, alpha: alpha)
     }
+
+    /// Whether the color is effectively transparent (alpha near zero).
+    var isTransparent: Bool { alpha < 0.01 }
 
     /// Greyscale presets for the background picker: 0%, 5%, 10%, 20%, 40%, 60%, 80%, 100%
     static let grayscalePresets: [CodableColor] = [
