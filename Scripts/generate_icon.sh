@@ -1,8 +1,7 @@
 #!/bin/bash
 # generate_icon.sh — Regenerate AppIcon.icns from PearblossomLogo.svg
 #
-# Prerequisites: ImageMagick (`magick` or `convert`)
-#   brew install imagemagick
+# Uses macOS built-in tools only (no external dependencies).
 #
 # Usage: ./Scripts/generate_icon.sh
 # Output: Sources/Pearblossom/Resources/AppIcon.icns
@@ -14,7 +13,6 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SVG_PATH="$PROJECT_DIR/Sources/Pearblossom/Resources/PearblossomLogo.svg"
 ICNS_OUT="$PROJECT_DIR/Sources/Pearblossom/Resources/AppIcon.icns"
 TMP_DIR="$(mktemp -d)"
-BASE_PNG="$TMP_DIR/icon_1024.png"
 ICONSET="$TMP_DIR/AppIcon.iconset"
 
 cleanup() { rm -rf "$TMP_DIR"; }
@@ -22,14 +20,13 @@ trap cleanup EXIT
 
 echo "==> Generating AppIcon.icns from $SVG_PATH"
 
-# Step 1: Render SVG to 1024x1024 PNG
+# Step 1: Render SVG to 1024x1024 PNG via macOS Quick Look (WebKit-based)
 echo "  [1/3] Rendering SVG to 1024×1024 PNG..."
-if command -v magick &>/dev/null; then
-    magick -density 144 -background none "$SVG_PATH" -resize 1024x1024 "$BASE_PNG"
-elif command -v convert &>/dev/null; then
-    convert -density 144 -background none "$SVG_PATH" -resize 1024x1024 "$BASE_PNG"
-else
-    echo "ERROR: ImageMagick not found. Install it with: brew install imagemagick"
+qlmanage -t -s 1024 -o "$TMP_DIR" "$SVG_PATH" &>/dev/null
+# qlmanage always names output <filename>.svg.png
+BASE_PNG="$TMP_DIR/PearblossomLogo.svg.png"
+if [[ ! -f "$BASE_PNG" ]]; then
+    echo "ERROR: qlmanage failed to render SVG"
     exit 1
 fi
 
