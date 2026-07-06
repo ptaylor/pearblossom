@@ -37,22 +37,15 @@ fi
 echo "  [2/3] Generating iconset..."
 mkdir -p "$ICONSET"
 
-declare -A SIZES=(
-    ["icon_16x16.png"]=16
-    ["icon_16x16@2x.png"]=32
-    ["icon_32x32.png"]=32
-    ["icon_32x32@2x.png"]=64
-    ["icon_128x128.png"]=128
-    ["icon_128x128@2x.png"]=256
-    ["icon_256x256.png"]=256
-    ["icon_256x256@2x.png"]=512
-    ["icon_512x512.png"]=512
-)
-
-for name in "${!SIZES[@]}"; do
-    dim="${SIZES[$name]}"
-    sips -z "$dim" "$dim" "$BASE_PNG" --out "$ICONSET/$name" &>/dev/null
-done
+sips -z 16 16   "$BASE_PNG" --out "$ICONSET/icon_16x16.png"       &>/dev/null
+sips -z 32 32   "$BASE_PNG" --out "$ICONSET/icon_16x16@2x.png"    &>/dev/null
+sips -z 32 32   "$BASE_PNG" --out "$ICONSET/icon_32x32.png"       &>/dev/null
+sips -z 64 64   "$BASE_PNG" --out "$ICONSET/icon_32x32@2x.png"    &>/dev/null
+sips -z 128 128 "$BASE_PNG" --out "$ICONSET/icon_128x128.png"     &>/dev/null
+sips -z 256 256 "$BASE_PNG" --out "$ICONSET/icon_128x128@2x.png"  &>/dev/null
+sips -z 256 256 "$BASE_PNG" --out "$ICONSET/icon_256x256.png"     &>/dev/null
+sips -z 512 512 "$BASE_PNG" --out "$ICONSET/icon_256x256@2x.png"  &>/dev/null
+sips -z 512 512 "$BASE_PNG" --out "$ICONSET/icon_512x512.png"     &>/dev/null
 
 # 512x512@2x is just the 1024 base image
 cp "$BASE_PNG" "$ICONSET/icon_512x512@2x.png"
