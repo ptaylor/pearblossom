@@ -65,3 +65,4 @@ coverage.*
 .vscode/
 *.swp
 *.bak
+PLANS.md
