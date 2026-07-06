@@ -20,14 +20,10 @@ struct ContentView: View {
     @State private var canvasMagnification: CGFloat = 1.0
     @State private var blankCanvasPrefill: BlankCanvasPrefill? = nil
 
-    @State private var isReady = false
-
     var body: some View {
-        Group {
-            if isReady {
-                HSplitView {
+        HSplitView {
             SidebarView(selectedProject: $state.project)
-                .frame(minWidth: 220, idealWidth: 250, maxWidth: 350)
+                .frame(minWidth: 220)
             CanvasView(project: $state.project, magnification: $canvasMagnification)
                 .frame(minWidth: 600)
                 .onDrop(of: [.plainText, .fileURL], isTargeted: nil) { providers, _ in
@@ -35,10 +31,9 @@ struct ContentView: View {
                     return true
                 }
             InspectorView(project: $state.project, magnification: $canvasMagnification)
-                .frame(minWidth: 220, idealWidth: 260, maxWidth: 350)
+                .frame(minWidth: 220)
         }
         .onChange(of: state.project?.id) { _, _ in updateWindowTitle() }
-        .onChange(of: state.project?.name) { _, _ in updateWindowTitle() }
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 updateWindowTitle()
@@ -74,11 +69,6 @@ struct ContentView: View {
                     }
                 }
             }
-        }
-            }
-        }
-        .onAppear {
-            isReady = true
         }
     }
 
