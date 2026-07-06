@@ -37,7 +37,8 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 350)
                 .frame(minWidth: 220)
         }
-        .onReceive(state.$project) { _ in updateWindowTitle() }
+        .onChange(of: state.project?.id) { _, _ in updateWindowTitle() }
+        .onChange(of: state.project?.name) { _, _ in updateWindowTitle() }
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 updateWindowTitle()
