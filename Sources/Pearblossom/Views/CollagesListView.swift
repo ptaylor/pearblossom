@@ -291,25 +291,22 @@ struct CollagesListView: View {
 
     private func deleteCollage(_ project: CollageProject) {
         Logger.debug("Deleting collage '\(project.name)'")
-        let fm = FileManager.default
 
-        // Remove the .collage.json file
+        // Clear project reference FIRST so views stop rendering before I/O
+        if selectedProject?.id == project.id {
+            selectedProject = nil
+        }
+        selectedCollageID = nil
+        collages.removeAll { $0.id == project.id }
+
+        // Then delete the .collage.json file
         if let path = project.filePath {
             let url = URL(fileURLWithPath: path)
-            // Safety: only delete files within the root directory
+            let fm = FileManager.default
             if url.path.hasPrefix(settings.collectionsRoot.path) {
                 try? fm.removeItem(at: url)
             }
         }
-
-        // If this was the selected project, clear it
-        if selectedProject?.id == project.id {
-            selectedProject = nil
-        }
-
-        // Remove from list
-        collages.removeAll { $0.id == project.id }
-        selectedCollageID = nil
     }
 }
 

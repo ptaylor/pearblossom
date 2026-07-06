@@ -15,11 +15,12 @@ final class CanvasNSView: NSView {
 
     var project: CollageProject? {
         didSet {
-            cachedComposite = nil   // Always invalidate composite (fast rebuild with cached sources)
+            guard project !== oldValue else { return }  // Same instance, skip reset
+            cachedComposite = nil
             cachedCompositeExtent = .zero
-            if !isDragging {
-                sourceImageCache = [:]  // Only clear source cache on non-drag changes
-            }
+            selectedLayerIDs = []
+            sourceImageCache = [:]
+            interactionMode = .none
             needsDisplay = true
         }
     }

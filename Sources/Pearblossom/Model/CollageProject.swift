@@ -1,23 +1,24 @@
 import Foundation
 import CoreGraphics
+import Combine
 
 /// A collage project — persisted as a .collage.json file.
-struct CollageProject: Codable, Identifiable {
-    var id: UUID = UUID()
-    var version: Int = 1
-    var name: String
-    var description: String = ""
-    var filePath: String?
-    var canvasWidth: CGFloat = 2000
-    var canvasHeight: CGFloat = 1500
-    var backgroundColor: CodableColor = .white
-    var layers: [PhotoLayer] = []
-    var boundingBoxMode: BoundingBoxMode = .definedBorder
-    var borderMargin: CGFloat = 40
-    var manualBoundingBox: CGRect? = nil
-    var showBoundingBox: Bool = true
-    var createdAt: Date = Date()
-    var modifiedAt: Date = Date()
+final class CollageProject: ObservableObject, Codable, Identifiable {
+    let id: UUID
+    let version: Int
+    @Published var name: String
+    @Published var description: String = ""
+    @Published var filePath: String?
+    @Published var canvasWidth: CGFloat = 2000
+    @Published var canvasHeight: CGFloat = 1500
+    @Published var backgroundColor: CodableColor = .white
+    @Published var layers: [PhotoLayer] = []
+    @Published var boundingBoxMode: BoundingBoxMode = .definedBorder
+    @Published var borderMargin: CGFloat = 40
+    @Published var manualBoundingBox: CGRect? = nil
+    @Published var showBoundingBox: Bool = true
+    let createdAt: Date
+    @Published var modifiedAt: Date
 
     enum CodingKeys: String, CodingKey {
         case id, version, name, description, filePath, canvasWidth, canvasHeight
@@ -56,7 +57,7 @@ struct CollageProject: Codable, Identifiable {
     /// Moves `layerID` relative to `targetID`. Toggle behavior: if the layer is
     /// currently below the target, it is placed just above it; if above, just below.
     /// All z-orders are then renumbered to contiguous integers starting at 0.
-    mutating func reorder(layerID: UUID, relativeTo targetID: UUID) {
+    func reorder(layerID: UUID, relativeTo targetID: UUID) {
         guard let layerIndex = layers.firstIndex(where: { $0.id == layerID }),
               let targetIndex = layers.firstIndex(where: { $0.id == targetID }),
               layerIndex != targetIndex else { return }
@@ -75,7 +76,7 @@ struct CollageProject: Codable, Identifiable {
         modifiedAt = Date()
     }
 
-    mutating func bringToFront(layerID: UUID) {
+    func bringToFront(layerID: UUID) {
         guard let index = layers.firstIndex(where: { $0.id == layerID }) else { return }
         let layer = layers.remove(at: index)
         layers.append(layer)
@@ -83,7 +84,7 @@ struct CollageProject: Codable, Identifiable {
         modifiedAt = Date()
     }
 
-    mutating func sendToBack(layerID: UUID) {
+    func sendToBack(layerID: UUID) {
         guard let index = layers.firstIndex(where: { $0.id == layerID }) else { return }
         let layer = layers.remove(at: index)
         layers.insert(layer, at: 0)
@@ -91,7 +92,7 @@ struct CollageProject: Codable, Identifiable {
         modifiedAt = Date()
     }
 
-    mutating func moveUp(layerID: UUID) {
+    func moveUp(layerID: UUID) {
         guard let index = layers.firstIndex(where: { $0.id == layerID }),
               index + 1 < layers.count else { return }
         layers.swapAt(index, index + 1)
@@ -99,7 +100,7 @@ struct CollageProject: Codable, Identifiable {
         modifiedAt = Date()
     }
 
-    mutating func moveDown(layerID: UUID) {
+    func moveDown(layerID: UUID) {
         guard let index = layers.firstIndex(where: { $0.id == layerID }),
               index > 0 else { return }
         layers.swapAt(index, index - 1)
@@ -107,7 +108,7 @@ struct CollageProject: Codable, Identifiable {
         modifiedAt = Date()
     }
 
-    private mutating func renumberZOrders() {
+    private func renumberZOrders() {
         for i in layers.indices {
             layers[i].zOrder = i
         }
@@ -145,7 +146,7 @@ struct CollageProject: Codable, Identifiable {
         self.modifiedAt = modifiedAt
     }
 
-    init(from decoder: Decoder) throws {
+    required init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(UUID.self, forKey: .id)
         version = try container.decodeIfPresent(Int.self, forKey: .version) ?? 1
@@ -164,6 +165,42 @@ struct CollageProject: Codable, Identifiable {
         showBoundingBox = try container.decodeIfPresent(Bool.self, forKey: .showBoundingBox) ?? true
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         modifiedAt = try container.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? Date()
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(version, forKey: .version)
+        try container.encode(name, forKey: .name)
+        try container.encode(description, forKey: .description)
+        try container.encode(filePath, forKey: .filePath)
+        try container.encode(canvasWidth, forKey: .canvasWidth)
+        try container.encode(canvasHeight, forKey: .canvasHeight)
+        try container.encode(backgroundColor, forKey: .backgroundColor)
+        try container.encode(layers, forKey: .layers)
+        try container.encode(boundingBoxMode, forKey: .boundingBoxMode)
+        try container.encode(borderMargin, forKey: .borderMargin)
+        try container.encode(manualBoundingBox, forKey: .manualBoundingBox)
+        try container.encode(showBoundingBox, forKey: .showBoundingBox)
+        try container.encode(createdAt, forKey: .createdAt)
+        try container.encode(modifiedAt, forKey: .modifiedAt)
+    }
+}
+
+/// Wraps an optional CollageProject so SwiftUI can observe changes to it.
+/// When the inner project is replaced or its @Published properties mutate,
+/// this wrapper forwards the change notifications so views stay in sync.
+final class ProjectState: ObservableObject {
+    @Published var project: CollageProject? = nil {
+        didSet { subscribe() }
+    }
+
+    private var cancellable: AnyCancellable?
+
+    private func subscribe() {
+        cancellable = project?.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
     }
 }
 

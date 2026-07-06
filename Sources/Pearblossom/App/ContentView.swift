@@ -15,32 +15,29 @@ struct BlankCanvasPrefill: Identifiable {
 /// The main content view with the three-column layout.
 struct ContentView: View {
 
-    @State private var currentProject: CollageProject? = nil
+    @StateObject private var state = ProjectState()
     @State private var selectedSidebarItem: String? = nil
     @State private var canvasMagnification: CGFloat = 1.0
     @State private var blankCanvasPrefill: BlankCanvasPrefill? = nil
 
     var body: some View {
         NavigationSplitView {
-            SidebarView(selectedProject: $currentProject)
+            SidebarView(selectedProject: $state.project)
                 .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 350)
                 .frame(minWidth: 220)
         } content: {
-            CanvasView(project: $currentProject, magnification: $canvasMagnification)
+            CanvasView(project: $state.project, magnification: $canvasMagnification)
                 .frame(minWidth: 600)
                 .onDrop(of: [.plainText, .fileURL], isTargeted: nil) { providers, _ in
                     handleCanvasDrop(providers: providers)
                     return true
                 }
         } detail: {
-            InspectorView(project: $currentProject, magnification: $canvasMagnification)
+            InspectorView(project: $state.project, magnification: $canvasMagnification)
                 .navigationSplitViewColumnWidth(min: 220, ideal: 260, max: 350)
                 .frame(minWidth: 220)
         }
-        .onChange(of: currentProject?.name) { _, _ in updateWindowTitle() }
-        .onChange(of: currentProject?.description) { _, _ in updateWindowTitle() }
-        .onChange(of: currentProject?.id) { _, _ in updateWindowTitle() }
-        .onChange(of: currentProject != nil) { _, _ in updateWindowTitle() }
+        .onReceive(state.$project) { _ in updateWindowTitle() }
         .onAppear {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 updateWindowTitle()
@@ -62,7 +59,7 @@ struct ContentView: View {
         }
         .sheet(item: $blankCanvasPrefill) { prefill in
             NewCollageDialog(initialName: prefill.name, initialDescription: prefill.description) { newCollage in
-                currentProject = newCollage
+                state.project = newCollage
                 DispatchQueue.main.async {
                     DispatchQueue.main.async {
                         let userInfo: [AnyHashable: Any] = [
@@ -126,7 +123,7 @@ struct ContentView: View {
             guard let window = NSApp.mainWindow ?? NSApp.windows.first else { return }
             let point = window.convertPoint(fromScreen: mouseLocation)
 
-            if currentProject != nil {
+            if state.project != nil {
                 NotificationCenter.default.post(name: .deferredDrop, object: nil, userInfo: [
                     "paths": allPaths, "pointX": point.x, "pointY": point.y,
                     "collectionID": parsedCollectionID as Any,
@@ -147,7 +144,7 @@ struct ContentView: View {
 
     private func updateWindowTitle() {
         let window = NSApp.mainWindow ?? NSApp.windows.first
-        if let proj = currentProject {
+        if let proj = state.project {
             if !proj.description.isEmpty {
                 window?.title = "Pearblossom: \(proj.name) — \(proj.description)"
             } else {

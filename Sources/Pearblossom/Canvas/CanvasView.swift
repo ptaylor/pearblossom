@@ -60,11 +60,12 @@ struct CanvasView: NSViewRepresentable {
                                            collectionID: collID, photoIDs: photoIDs)
         }
 
-        // Wire up auto-save on canvas mutations — also push changes back to binding
-        // so Inspector toggles etc. don't overwrite dragged positions with stale data.
+        // Wire up auto-save on canvas mutations.
+        // Since CollageProject is an ObservableObject, mutations are in-place
+        // and @Published properties trigger SwiftUI updates automatically.
         canvas.onLayersChanged = { [weak canvas] in
             guard let canvas = canvas, let proj = canvas.project else { return }
-            context.coordinator.projectBinding.wrappedValue = proj
+            proj.modifiedAt = Date()  // triggers @Published → SwiftUI observes change
             context.coordinator.scheduleAutoSave(canvas: canvas)
         }
 
