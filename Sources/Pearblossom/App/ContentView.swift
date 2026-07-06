@@ -20,8 +20,12 @@ struct ContentView: View {
     @State private var canvasMagnification: CGFloat = 1.0
     @State private var blankCanvasPrefill: BlankCanvasPrefill? = nil
 
+    @State private var isReady = false
+
     var body: some View {
-        NavigationSplitView {
+        Group {
+            if isReady {
+                NavigationSplitView {
             SidebarView(selectedProject: $state.project)
                 .navigationSplitViewColumnWidth(min: 220, ideal: 250, max: 350)
                 .frame(minWidth: 220)
@@ -74,6 +78,11 @@ struct ContentView: View {
                     }
                 }
             }
+        }
+            }
+        }
+        .onAppear {
+            isReady = true
         }
     }
 
