@@ -216,7 +216,10 @@ struct InspectorView: View {
                 Text("Manual").tag(BoundingBoxMode.manual)
             }
             .pickerStyle(.segmented)
-            .onChange(of: binding.wrappedValue.boundingBoxMode) { _, _ in
+            .onChange(of: binding.wrappedValue.boundingBoxMode) { _, newMode in
+                if newMode == .manual {
+                    binding.wrappedValue.ensureManualBoundingBox()
+                }
                 binding.wrappedValue.modifiedAt = Date()
             }
 

@@ -252,7 +252,7 @@ enum ExportRenderer {
             }
         }
 
-        return composite
+        return composite.cropped(to: CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight))
     }
 
     /// Builds a multi-exposure composite: each photo at 1/N opacity composited
@@ -336,6 +336,6 @@ enum ExportRenderer {
             }
         }
 
-        return composite
+        return composite.cropped(to: CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight))
     }
 }

@@ -25,6 +25,9 @@ final class CanvasNSView: NSView {
             interactionMode = .none
             needsDisplay = true
             subscribeToProjectChanges()
+            // Seed manual bounding box if the loaded project is in manual mode
+            // but has no saved bounding box (e.g. from an older version).
+            project?.ensureManualBoundingBox()
         }
     }
 
@@ -53,9 +56,16 @@ final class CanvasNSView: NSView {
         case moving
         case rotating
         case resizing(corner: ResizeCorner)
+        case resizingBoundingBox(corner: BBResizeCorner)
     }
 
     private enum ResizeCorner {
+        case topLeft, topRight, bottomLeft, bottomRight
+        case top, bottom, left, right
+    }
+
+    /// Bounding box resize handle identifiers.
+    private enum BBResizeCorner {
         case topLeft, topRight, bottomLeft, bottomRight
         case top, bottom, left, right
     }
@@ -67,6 +77,10 @@ final class CanvasNSView: NSView {
     private var resizeStartPosition: CGPoint = .zero  // initial layer position when resize began
     private var resizeOppositeCorner: CGPoint = .zero // anchor corner (doesn't move)
     private var resizeAspectRatio: CGFloat = 1.0      // width/height of layer at resize start
+
+    // Bounding box resize state
+    private var bbResizeStartRect: CGRect = .zero     // initial BB rect when resize began
+    private var bbResizeOppositeCorner: CGPoint = .zero // anchor corner for BB resize
 
     private var currentBackground: CGColor {
         project?.backgroundColor.cgColor ?? .white
@@ -118,7 +132,11 @@ final class CanvasNSView: NSView {
             renderLayers(proj, in: cgContext)
 
             if proj.showBoundingBox {
-                drawBoundingBox(proj.effectiveBoundingBox(), on: currentBackground, in: cgContext)
+                let bb = proj.effectiveBoundingBox()
+                drawBoundingBox(bb, on: currentBackground, in: cgContext)
+                if proj.boundingBoxMode == .manual {
+                    drawBoundingBoxHandles(bb, in: cgContext)
+                }
             }
         } else if let proj = project {
             // No layers: fill entire canvas with background
@@ -129,7 +147,11 @@ final class CanvasNSView: NSView {
                 cgContext.fill(bounds)
             }
             if proj.showBoundingBox {
-                drawBoundingBox(proj.effectiveBoundingBox(), on: currentBackground, in: cgContext)
+                let bb = proj.effectiveBoundingBox()
+                drawBoundingBox(bb, on: currentBackground, in: cgContext)
+                if proj.boundingBoxMode == .manual {
+                    drawBoundingBoxHandles(bb, in: cgContext)
+                }
             }
         } else {
             cgContext.setFillColor(currentBackground)
@@ -517,6 +539,48 @@ final class CanvasNSView: NSView {
         context.setLineDash(phase: 0, lengths: [])
     }
 
+    /// Draw resize handles on the bounding box when in manual mode.
+    private func drawBoundingBoxHandles(_ rect: CGRect, in context: CGContext) {
+        let handleColor = NSColor.systemBlue.cgColor
+        let handleSize: CGFloat = 7
+
+        // Corner handles — small squares
+        let corners: [CGPoint] = [
+            CGPoint(x: rect.minX, y: rect.minY),   // topLeft
+            CGPoint(x: rect.maxX, y: rect.minY),   // topRight
+            CGPoint(x: rect.minX, y: rect.maxY),   // bottomLeft
+            CGPoint(x: rect.maxX, y: rect.maxY),   // bottomRight
+        ]
+        for pt in corners {
+            let hr = CGRect(x: pt.x - handleSize/2, y: pt.y - handleSize/2,
+                            width: handleSize, height: handleSize)
+            context.setFillColor(NSColor.white.cgColor)
+            context.fill(hr)
+            context.setStrokeColor(handleColor)
+            context.setLineWidth(1.5)
+            context.stroke(hr)
+        }
+
+        // Edge midpoint handles — small rectangles
+        let midHandleW: CGFloat = 18
+        let midHandleH: CGFloat = 5
+        let midHandles: [CGPoint] = [
+            CGPoint(x: rect.midX, y: rect.minY),   // top
+            CGPoint(x: rect.midX, y: rect.maxY),   // bottom
+            CGPoint(x: rect.minX, y: rect.midY),   // left
+            CGPoint(x: rect.maxX, y: rect.midY),   // right
+        ]
+        for pt in midHandles {
+            let mr = CGRect(x: pt.x - midHandleW/2, y: pt.y - midHandleH/2,
+                            width: midHandleW, height: midHandleH)
+            context.setFillColor(NSColor.white.cgColor)
+            context.fill(mr)
+            context.setStrokeColor(handleColor)
+            context.setLineWidth(1)
+            context.stroke(mr)
+        }
+    }
+
     private func drawPlaceholder(in context: CGContext) {
         let text = "Drag photos here"
         let attrs: [NSAttributedString.Key: Any] = [
@@ -593,6 +657,44 @@ final class CanvasNSView: NSView {
         return nil
     }
 
+    /// Returns the BB resize corner/edge if the point hits a handle of the bounding box
+    /// when in manual mode.
+    private func boundingBoxHandleHit(at point: CGPoint) -> BBResizeCorner? {
+        guard let proj = project,
+              proj.boundingBoxMode == .manual,
+              proj.showBoundingBox else { return nil }
+        let rect = proj.effectiveBoundingBox()
+        let halfH: CGFloat = 10  // generous hit zone
+
+        // Corner handles (checked first so corners take priority over edges)
+        let corners: [(CGPoint, BBResizeCorner)] = [
+            (CGPoint(x: rect.minX, y: rect.minY), .topLeft),
+            (CGPoint(x: rect.maxX, y: rect.minY), .topRight),
+            (CGPoint(x: rect.minX, y: rect.maxY), .bottomLeft),
+            (CGPoint(x: rect.maxX, y: rect.maxY), .bottomRight),
+        ]
+        for (pt, corner) in corners {
+            let hitRect = CGRect(x: pt.x - halfH, y: pt.y - halfH,
+                                 width: halfH*2, height: halfH*2)
+            if hitRect.contains(point) { return corner }
+        }
+
+        // Edge midpoint handles
+        let edges: [(CGPoint, BBResizeCorner)] = [
+            (CGPoint(x: rect.midX, y: rect.minY), .top),
+            (CGPoint(x: rect.midX, y: rect.maxY), .bottom),
+            (CGPoint(x: rect.minX, y: rect.midY), .left),
+            (CGPoint(x: rect.maxX, y: rect.midY), .right),
+        ]
+        let edgeHalfH: CGFloat = 8
+        for (pt, edge) in edges {
+            let hitRect = CGRect(x: pt.x - edgeHalfH, y: pt.y - edgeHalfH,
+                                 width: edgeHalfH*2, height: edgeHalfH*2)
+            if hitRect.contains(point) { return edge }
+        }
+        return nil
+    }
+
     // MARK: - Mouse Events
 
     override func mouseDown(with event: NSEvent) {
@@ -605,7 +707,7 @@ final class CanvasNSView: NSView {
            let clickedLayer = layerAt(point: point),
            let selectedID = selectedLayerIDs.first,
            selectedID != clickedLayer.id,
-           var proj = project {
+           let proj = project {
             proj.reorder(layerID: selectedID, relativeTo: clickedLayer.id)
             project = proj
             cachedComposite = nil
@@ -632,7 +734,6 @@ final class CanvasNSView: NSView {
             resizeStartSize = layer.size
             resizeStartPosition = layer.position
             resizeAspectRatio = layer.size.width / max(layer.size.height, 1)
-            // Compute the opposite (anchor) corner
             let rect = CGRect(x: layer.position.x - layer.size.width / 2,
                               y: layer.position.y - layer.size.height / 2,
                               width: layer.size.width, height: layer.size.height)
@@ -661,11 +762,32 @@ final class CanvasNSView: NSView {
             dragOffset = CGPoint(x: point.x - layer.position.x, y: point.y - layer.position.y)
             interactionMode = .moving
             needsDisplay = true
-        } else {
-            selectedLayerIDs = []
-            interactionMode = .none
-            needsDisplay = true
+            return
         }
+
+        // 5. Bounding box handle hit (manual mode) — only if no layer was hit
+        if let bbCorner = boundingBoxHandleHit(at: point) {
+            interactionMode = .resizingBoundingBox(corner: bbCorner)
+            let bb = project?.effectiveBoundingBox() ?? .zero
+            bbResizeStartRect = bb
+            switch bbCorner {
+            case .topLeft:     bbResizeOppositeCorner = CGPoint(x: bb.maxX, y: bb.maxY)
+            case .topRight:    bbResizeOppositeCorner = CGPoint(x: bb.minX, y: bb.maxY)
+            case .bottomLeft:  bbResizeOppositeCorner = CGPoint(x: bb.maxX, y: bb.minY)
+            case .bottomRight: bbResizeOppositeCorner = CGPoint(x: bb.minX, y: bb.minY)
+            case .top:         bbResizeOppositeCorner = CGPoint(x: bb.midX, y: bb.maxY)
+            case .bottom:      bbResizeOppositeCorner = CGPoint(x: bb.midX, y: bb.minY)
+            case .left:        bbResizeOppositeCorner = CGPoint(x: bb.maxX, y: bb.midY)
+            case .right:       bbResizeOppositeCorner = CGPoint(x: bb.minX, y: bb.midY)
+            }
+            Logger.debug("mouseDown: BB resize start, corner=\(bbCorner), anchor=\(bbResizeOppositeCorner)")
+            return
+        }
+
+        // 6. Click on empty canvas — deselect all
+        selectedLayerIDs = []
+        interactionMode = .none
+        needsDisplay = true
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -766,6 +888,62 @@ final class CanvasNSView: NSView {
                     proj.layers[index].position = CGPoint(x: point.x - dragOffset.x, y: point.y - dragOffset.y)
                 }
             }
+            project = proj
+            needsDisplay = true
+
+        case .resizingBoundingBox(let corner):
+            guard var proj = project else { return }
+            let anchor = bbResizeOppositeCorner
+            var newBB = bbResizeStartRect
+
+            switch corner {
+            case .topLeft:
+                let newMinX = min(point.x, anchor.x - 20)
+                let newMinY = min(point.y, anchor.y - 20)
+                newBB.origin.x = newMinX
+                newBB.origin.y = newMinY
+                newBB.size.width = anchor.x - newMinX
+                newBB.size.height = anchor.y - newMinY
+            case .topRight:
+                let newMaxX = max(point.x, anchor.x + 20)
+                let newMinY = min(point.y, anchor.y - 20)
+                newBB.origin.y = newMinY
+                newBB.size.width = newMaxX - anchor.x
+                newBB.size.height = anchor.y - newMinY
+            case .bottomLeft:
+                let newMinX = min(point.x, anchor.x - 20)
+                let newMaxY = max(point.y, anchor.y + 20)
+                newBB.origin.x = newMinX
+                newBB.size.width = anchor.x - newMinX
+                newBB.size.height = newMaxY - anchor.y
+            case .bottomRight:
+                let newMaxX = max(point.x, anchor.x + 20)
+                let newMaxY = max(point.y, anchor.y + 20)
+                newBB.size.width = newMaxX - anchor.x
+                newBB.size.height = newMaxY - anchor.y
+            case .top:
+                let newMinY = min(point.y, anchor.y - 20)
+                newBB.origin.y = newMinY
+                newBB.size.height = anchor.y - newMinY
+            case .bottom:
+                let newMaxY = max(point.y, anchor.y + 20)
+                newBB.size.height = newMaxY - anchor.y
+            case .left:
+                let newMinX = min(point.x, anchor.x - 20)
+                newBB.origin.x = newMinX
+                newBB.size.width = anchor.x - newMinX
+            case .right:
+                let newMaxX = max(point.x, anchor.x + 20)
+                newBB.size.width = newMaxX - anchor.x
+            }
+
+            // Clamp to canvas bounds (must stay within canvas)
+            newBB.origin.x = max(0, newBB.origin.x)
+            newBB.origin.y = max(0, newBB.origin.y)
+            if newBB.maxX > bounds.width { newBB.size.width = bounds.width - newBB.origin.x }
+            if newBB.maxY > bounds.height { newBB.size.height = bounds.height - newBB.origin.y }
+
+            proj.manualBoundingBox = newBB
             project = proj
             needsDisplay = true
 

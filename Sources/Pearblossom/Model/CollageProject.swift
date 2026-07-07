@@ -28,29 +28,44 @@ final class CollageProject: ObservableObject, Codable, Identifiable {
     }
 
     /// Computes the effective bounding box based on mode and layer positions.
+    /// Pure getter — does not mutate state.
     func effectiveBoundingBox() -> CGRect {
         let canvasRect = CGRect(x: 0, y: 0, width: canvasWidth, height: canvasHeight)
         switch boundingBoxMode {
         case .manual:
             return manualBoundingBox ?? canvasRect
         case .definedBorder:
-            guard !layers.isEmpty else { return canvasRect }
-            let unionRect = layers.reduce(into: CGRect?.none) { result, layer in
-                // Account for rotation: the axis-aligned bounding box of a rotated rect
-                let cosA = abs(cos(layer.rotation))
-                let sinA = abs(sin(layer.rotation))
-                let boundingW = layer.size.width * cosA + layer.size.height * sinA
-                let boundingH = layer.size.width * sinA + layer.size.height * cosA
-                let layerRect = CGRect(
-                    x: layer.position.x - boundingW / 2,
-                    y: layer.position.y - boundingH / 2,
-                    width: boundingW,
-                    height: boundingH
-                )
-                result = result?.union(layerRect) ?? layerRect
-            } ?? canvasRect
-            return unionRect.insetBy(dx: -borderMargin, dy: -borderMargin)
+            return computeDefinedBorderBox()
         }
+    }
+
+    /// Seeds the manual bounding box from the current defined-border calculation
+    /// if it has not been set yet. Call this when switching to manual mode.
+    func ensureManualBoundingBox() {
+        guard boundingBoxMode == .manual, manualBoundingBox == nil else { return }
+        manualBoundingBox = computeDefinedBorderBox()
+    }
+
+    /// Computes the defined-border bounding box: the union of all layer rects
+    /// (accounting for rotation) plus the border margin. Does not consult mode.
+    private func computeDefinedBorderBox() -> CGRect {
+        let canvasRect = CGRect(x: 0, y: 0, width: canvasWidth, height: canvasHeight)
+        guard !layers.isEmpty else { return canvasRect }
+        let unionRect = layers.reduce(into: CGRect?.none) { result, layer in
+            // Account for rotation: the axis-aligned bounding box of a rotated rect
+            let cosA = abs(cos(layer.rotation))
+            let sinA = abs(sin(layer.rotation))
+            let boundingW = layer.size.width * cosA + layer.size.height * sinA
+            let boundingH = layer.size.width * sinA + layer.size.height * cosA
+            let layerRect = CGRect(
+                x: layer.position.x - boundingW / 2,
+                y: layer.position.y - boundingH / 2,
+                width: boundingW,
+                height: boundingH
+            )
+            result = result?.union(layerRect) ?? layerRect
+        } ?? canvasRect
+        return unionRect.insetBy(dx: -borderMargin, dy: -borderMargin)
     }
 
     // MARK: - Layer Reordering
