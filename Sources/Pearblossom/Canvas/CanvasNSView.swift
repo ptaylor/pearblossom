@@ -751,21 +751,8 @@ final class CanvasNSView: NSView {
             return
         }
 
-        // 4. Layer selection / move
-        if let layer = layerAt(point: point) {
-            if event.modifierFlags.contains(.shift) {
-                if selectedLayerIDs.contains(layer.id) { selectedLayerIDs.remove(layer.id) }
-                else { selectedLayerIDs.insert(layer.id) }
-            } else {
-                selectedLayerIDs = [layer.id]
-            }
-            dragOffset = CGPoint(x: point.x - layer.position.x, y: point.y - layer.position.y)
-            interactionMode = .moving
-            needsDisplay = true
-            return
-        }
-
-        // 5. Bounding box handle hit (manual mode) — only if no layer was hit
+        // 4. Bounding box handle hit (manual mode) — checked before generic
+        //    layer selection so BB handles work even when overlapping an image.
         if let bbCorner = boundingBoxHandleHit(at: point) {
             interactionMode = .resizingBoundingBox(corner: bbCorner)
             let bb = project?.effectiveBoundingBox() ?? .zero
@@ -781,6 +768,20 @@ final class CanvasNSView: NSView {
             case .right:       bbResizeOppositeCorner = CGPoint(x: bb.minX, y: bb.midY)
             }
             Logger.debug("mouseDown: BB resize start, corner=\(bbCorner), anchor=\(bbResizeOppositeCorner)")
+            return
+        }
+
+        // 5. Layer selection / move
+        if let layer = layerAt(point: point) {
+            if event.modifierFlags.contains(.shift) {
+                if selectedLayerIDs.contains(layer.id) { selectedLayerIDs.remove(layer.id) }
+                else { selectedLayerIDs.insert(layer.id) }
+            } else {
+                selectedLayerIDs = [layer.id]
+            }
+            dragOffset = CGPoint(x: point.x - layer.position.x, y: point.y - layer.position.y)
+            interactionMode = .moving
+            needsDisplay = true
             return
         }
 
