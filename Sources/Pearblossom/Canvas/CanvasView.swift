@@ -99,9 +99,22 @@ struct CanvasView: NSViewRepresentable {
                 canvas.setFrameSize(newSize)
             }
         }
-        // Sync magnification from binding → scroll view (for slider changes)
+        // Sync magnification from binding → scroll view (for slider changes).
+        // Save the document-space center, apply magnification, then re-center
+        // so the canvas stays anchored on the same content.
         if abs(scrollView.magnification - magnification) > 0.001 {
+            let oldCenter = CGPoint(
+                x: scrollView.contentView.documentVisibleRect.midX,
+                y: scrollView.contentView.documentVisibleRect.midY
+            )
             scrollView.magnification = magnification
+            scrollView.layout()
+            let newVisible = scrollView.contentView.documentVisibleRect
+            let newOrigin = CGPoint(
+                x: oldCenter.x - newVisible.width / 2,
+                y: oldCenter.y - newVisible.height / 2
+            )
+            scrollView.contentView.scroll(to: newOrigin)
         }
     }
 

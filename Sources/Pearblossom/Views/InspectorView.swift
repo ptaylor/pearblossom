@@ -27,11 +27,7 @@ struct InspectorView: View {
                         Divider()
                         shadowSection(binding)
                         Divider()
-                    }
-
-                    zoomSection()
-
-                    if let binding = Binding($project) {
+                        zoomSection()
                         Divider()
                         canvasInfoSection(binding.wrappedValue)
                         Divider()
