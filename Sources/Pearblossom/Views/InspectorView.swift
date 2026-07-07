@@ -327,42 +327,51 @@ struct InspectorView: View {
     // MARK: - Zoom Section
 
     private func zoomSection() -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             Text("Zoom")
                 .font(.headline)
 
-            VStack(alignment: .leading, spacing: 6) {
-                Slider(value: $magnification, in: 0.1...5.0, step: 0.05)
-                    .help("Zoom Level")
+            Slider(value: $magnification, in: 0.1...5.0, step: 0.25)
+                .help("Zoom Level")
 
-                HStack {
-                    Text("\(Int(magnification * 100))%")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .monospacedDigit()
+            HStack {
+                Spacer()
+                Text("\(Int(magnification * 100))%")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .monospacedDigit()
+                Spacer()
+            }
 
-                    Spacer()
-
-                    Button {
-                        let newMag = max(magnification - 0.25, 0.1)
-                        magnification = newMag
-                    } label: {
-                        Image(systemName: "minus.magnifyingglass")
-                    }
-                    .buttonStyle(.borderless)
-                    .controlSize(.small)
-                    .help("Zoom Out (⌘–)")
-
-                    Button {
-                        let newMag = min(magnification + 0.25, 5.0)
-                        magnification = newMag
-                    } label: {
-                        Image(systemName: "plus.magnifyingglass")
-                    }
-                    .buttonStyle(.borderless)
-                    .controlSize(.small)
-                    .help("Zoom In (⌘+)")
+            HStack(spacing: 12) {
+                Button {
+                    let newMag = max(magnification - 0.25, 0.1)
+                    magnification = newMag
+                } label: {
+                    Image(systemName: "minus.magnifyingglass")
                 }
+                .buttonStyle(.borderless)
+                .controlSize(.small)
+                .help("Zoom Out (⌘–)")
+
+                Button("Reset") {
+                    magnification = 1.0
+                }
+                .buttonStyle(.borderless)
+                .controlSize(.small)
+                .font(.caption)
+
+                Spacer()
+
+                Button {
+                    let newMag = min(magnification + 0.25, 5.0)
+                    magnification = newMag
+                } label: {
+                    Image(systemName: "plus.magnifyingglass")
+                }
+                .buttonStyle(.borderless)
+                .controlSize(.small)
+                .help("Zoom In (⌘+)")
             }
         }
     }
