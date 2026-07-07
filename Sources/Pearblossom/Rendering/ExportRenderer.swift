@@ -131,6 +131,18 @@ enum ExportRenderer {
         let outputWidth = ceil(boundingBox.width * scaleX)
         let outputHeight = ceil(boundingBox.height * scaleY)
 
+        // Multi-exposure: additive compositing over black, then overlay white if needed
+        if project.isMultiExposure {
+            return buildMultiExposureComposite(
+                project: project,
+                scaleX: scaleX,
+                scaleY: scaleY,
+                boundingBox: boundingBox,
+                outputWidth: outputWidth,
+                outputHeight: outputHeight
+            )
+        }
+
         // Fill background with the collage's background color.
         // CIConstantColorGenerator is the canonical way to create a
         // solid-color CIImage (CIImage(color:) + cropped can be unreliable).
@@ -235,6 +247,90 @@ enum ExportRenderer {
             let f = CIFilter(name: "CISourceOverCompositing")!
             f.setValue(t, forKey: kCIInputImageKey)
             f.setValue(composite, forKey: kCIInputBackgroundImageKey)
+            if let result = f.outputImage {
+                composite = result
+            }
+        }
+
+        return composite
+    }
+
+    /// Builds a multi-exposure composite: each photo at 1/N opacity composited
+    /// additively over black. If the project background is white, the result is
+    /// then source-over composited onto a white fill so uncovered areas show white.
+    private static func buildMultiExposureComposite(
+        project: CollageProject,
+        scaleX: CGFloat,
+        scaleY: CGFloat,
+        boundingBox: CGRect,
+        outputWidth: CGFloat,
+        outputHeight: CGFloat
+    ) -> CIImage? {
+        let layers = project.layers
+        let n = CGFloat(max(layers.count, 1))
+        let meOpacity = 1.0 / n
+
+        // Start with black fill (addition over black = pure average)
+        let blackGen = CIFilter(name: "CIConstantColorGenerator")!
+        blackGen.setValue(CIColor(red: 0, green: 0, blue: 0, alpha: 1), forKey: kCIInputColorKey)
+        var composite = blackGen.outputImage!.cropped(to: CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight))
+
+        // Sort for determinism only — addition is commutative
+        let sorted = layers.sorted { $0.zOrder < $1.zOrder }
+
+        for layer in sorted {
+            let resolvedPath = layer.resolvedPhotoPath()
+            let url = URL(fileURLWithPath: resolvedPath)
+            guard let sourceImage = CIImage(contentsOf: url, options: [.applyOrientationProperty: true]) else {
+                Logger.warn("ExportRenderer: failed to load source image from \(resolvedPath), skipping layer \(layer.id)")
+                continue
+            }
+
+            let displayW = layer.size.width * scaleX
+            let displayH = layer.size.height * scaleY
+            let sourceExt = sourceImage.extent
+            let sx = displayW / max(sourceExt.width, 1)
+            let sy = displayH / max(sourceExt.height, 1)
+            let halfW = displayW / 2
+            let halfH = displayH / 2
+            let sourceHalfW = sourceExt.width / 2
+            let sourceHalfH = sourceExt.height / 2
+
+            var t = sourceImage
+            t = t.transformed(by: CGAffineTransform(translationX: -sourceHalfW, y: -sourceHalfH))
+            t = t.transformed(by: CGAffineTransform(rotationAngle: layer.rotation))
+            t = t.transformed(by: CGAffineTransform(translationX: sourceHalfW, y: sourceHalfH))
+            t = t.transformed(by: CGAffineTransform(scaleX: sx, y: sy))
+            let exportX = (layer.position.x - boundingBox.origin.x) * scaleX - halfW
+            let exportY = outputHeight - (layer.position.y - boundingBox.origin.y) * scaleY - halfH
+            t = t.transformed(by: CGAffineTransform(translationX: exportX, y: exportY))
+
+            // Apply equal-blend opacity (1/N). Skip shadows.
+            let mat = CIFilter(name: "CIColorMatrix")!
+            mat.setValue(t, forKey: kCIInputImageKey)
+            mat.setValue(CIVector(x: 0, y: 0, z: 0, w: meOpacity), forKey: "inputAVector")
+            t = mat.outputImage ?? t
+
+            let add = CIFilter(name: "CIAdditionCompositing")!
+            add.setValue(t, forKey: kCIInputImageKey)
+            add.setValue(composite, forKey: kCIInputBackgroundImageKey)
+            if let result = add.outputImage {
+                composite = result
+            }
+        }
+
+        // If the project background is white, composite the additive result
+        // over a white fill so uncovered areas show white instead of black.
+        if !project.backgroundColor.isTransparent
+           && project.backgroundColor.red >= 0.99
+           && project.backgroundColor.green >= 0.99
+           && project.backgroundColor.blue >= 0.99 {
+            let whiteGen = CIFilter(name: "CIConstantColorGenerator")!
+            whiteGen.setValue(CIColor(red: 1, green: 1, blue: 1, alpha: 1), forKey: kCIInputColorKey)
+            let whiteBg = whiteGen.outputImage!.cropped(to: CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight))
+            let f = CIFilter(name: "CISourceOverCompositing")!
+            f.setValue(composite, forKey: kCIInputImageKey)
+            f.setValue(whiteBg, forKey: kCIInputBackgroundImageKey)
             if let result = f.outputImage {
                 composite = result
             }

@@ -153,6 +153,13 @@ final class CanvasNSView: NSView {
 
         let sorted = proj.layers.sorted { $0.zOrder < $1.zOrder }
         let canvasH = bounds.height
+
+        if proj.isMultiExposure {
+            renderMultiExposureLayers(proj, sorted: sorted, canvasH: canvasH, in: cgContext)
+            return
+        }
+
+        // --- Standard source-over compositing ---
         var composite: CIImage?
 
         for layer in sorted {
@@ -261,6 +268,78 @@ final class CanvasNSView: NSView {
         }
 
         // Generate and cache the CGImage, then draw at the correct canvas position
+        if let final = composite, let cgImage = ciContext.createCGImage(final, from: final.extent) {
+            cachedComposite = cgImage
+            cachedCompositeExtent = final.extent
+            drawCGImageFlipped(cgImage, extent: final.extent, canvasH: canvasH, in: cgContext)
+        }
+    }
+
+    /// Multi-exposure compositing: each photo at 1/N opacity, added together.
+    /// This mimics camera multi-exposure where each frame contributes equally.
+    /// Shadows are skipped (meaningless with additive blend).
+    private func renderMultiExposureLayers(_ proj: CollageProject, sorted: [PhotoLayer], canvasH: CGFloat, in cgContext: CGContext) {
+        let n = CGFloat(max(sorted.count, 1))
+        let meOpacity = 1.0 / n
+        var composite: CIImage?
+
+        for layer in sorted {
+            let resolvedPath = layer.resolvedPhotoPath()
+
+            let sourceImage: CIImage
+            if let cached = sourceImageCache[layer.id] {
+                sourceImage = cached
+            } else {
+                let url = URL(fileURLWithPath: resolvedPath)
+                if let img = CIImage(contentsOf: url, options: [.applyOrientationProperty: true]) {
+                    let maxDim: CGFloat = 1024
+                    let extent = img.extent
+                    if extent.width > maxDim || extent.height > maxDim {
+                        let ds = min(maxDim / extent.width, maxDim / extent.height)
+                        sourceImage = img.transformed(by: CGAffineTransform(scaleX: ds, y: ds))
+                    } else {
+                        sourceImage = img
+                    }
+                    sourceImageCache[layer.id] = sourceImage
+                } else {
+                    Logger.warn("renderMultiExposureLayers: failed to load CIImage from \(resolvedPath)")
+                    continue
+                }
+            }
+
+            let halfW = layer.size.width / 2
+            let halfH = layer.size.height / 2
+            var t = sourceImage
+
+            let workingExtent = sourceImage.extent
+            let sx = layer.size.width / max(workingExtent.width, 1)
+            let sy = layer.size.height / max(workingExtent.height, 1)
+            t = t.transformed(by: CGAffineTransform(scaleX: sx, y: sy))
+            t = t.transformed(by: CGAffineTransform(translationX: -halfW, y: -halfH))
+            t = t.transformed(by: CGAffineTransform(rotationAngle: layer.rotation))
+            t = t.transformed(by: CGAffineTransform(translationX: halfW, y: halfH))
+            t = t.transformed(by: CGAffineTransform(
+                translationX: layer.position.x - halfW,
+                y: canvasH - layer.position.y - halfH
+            ))
+
+            // Apply equal-blend opacity: 1/N
+            let f = CIFilter(name: "CIColorMatrix")!
+            f.setValue(t, forKey: kCIInputImageKey)
+            f.setValue(CIVector(x: 0, y: 0, z: 0, w: meOpacity), forKey: "inputAVector")
+            t = f.outputImage ?? t
+
+            // Additive composite (order-independent, shadows skipped)
+            if let existing = composite {
+                let add = CIFilter(name: "CIAdditionCompositing")!
+                add.setValue(t, forKey: kCIInputImageKey)
+                add.setValue(existing, forKey: kCIInputBackgroundImageKey)
+                composite = add.outputImage
+            } else {
+                composite = t
+            }
+        }
+
         if let final = composite, let cgImage = ciContext.createCGImage(final, from: final.extent) {
             cachedComposite = cgImage
             cachedCompositeExtent = final.extent

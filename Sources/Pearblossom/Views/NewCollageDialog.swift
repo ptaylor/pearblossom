@@ -8,6 +8,7 @@ struct NewCollageDialog: View {
     @State private var name: String
     @State private var description: String
     @State private var nameError: String? = nil
+    @State private var isMultiExposure = false
 
     var onCreated: ((CollageProject) -> Void)?
     @Environment(\.dismiss) private var dismiss
@@ -42,6 +43,18 @@ struct NewCollageDialog: View {
 
                 TextField("Optional", text: $description)
                     .textFieldStyle(.roundedBorder)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Toggle("Multi-Exposure", isOn: $isMultiExposure)
+                    .font(.callout)
+
+                if isMultiExposure {
+                    Text("Photos blend equally regardless of layering order. Best with solid black, white, or transparent backgrounds.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
 
             if let error = nameError {
@@ -112,7 +125,8 @@ struct NewCollageDialog: View {
                 description: description,
                 filePath: fileURL.path,
                 backgroundColor: settings.defaultBackgroundColor,
-                borderMargin: settings.defaultBorderMargin
+                borderMargin: settings.defaultBorderMargin,
+                isMultiExposure: isMultiExposure
             )
 
             // Write .collage.json

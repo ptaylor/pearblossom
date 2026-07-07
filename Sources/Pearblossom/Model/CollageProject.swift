@@ -17,13 +17,14 @@ final class CollageProject: ObservableObject, Codable, Identifiable {
     @Published var borderMargin: CGFloat = 40
     @Published var manualBoundingBox: CGRect? = nil
     @Published var showBoundingBox: Bool = true
+    @Published var isMultiExposure: Bool = false
     let createdAt: Date
     @Published var modifiedAt: Date
 
     enum CodingKeys: String, CodingKey {
         case id, version, name, description, filePath, canvasWidth, canvasHeight
         case backgroundColor, layers, boundingBoxMode, borderMargin, manualBoundingBox
-        case showBoundingBox, createdAt, modifiedAt
+        case showBoundingBox, isMultiExposure, createdAt, modifiedAt
     }
 
     /// Computes the effective bounding box based on mode and layer positions.
@@ -127,6 +128,7 @@ final class CollageProject: ObservableObject, Codable, Identifiable {
          borderMargin: CGFloat = 40,
          manualBoundingBox: CGRect? = nil,
          showBoundingBox: Bool = true,
+         isMultiExposure: Bool = false,
          createdAt: Date = Date(),
          modifiedAt: Date = Date()) {
         self.id = id
@@ -142,6 +144,7 @@ final class CollageProject: ObservableObject, Codable, Identifiable {
         self.borderMargin = borderMargin
         self.manualBoundingBox = manualBoundingBox
         self.showBoundingBox = showBoundingBox
+        self.isMultiExposure = isMultiExposure
         self.createdAt = createdAt
         self.modifiedAt = modifiedAt
     }
@@ -163,6 +166,7 @@ final class CollageProject: ObservableObject, Codable, Identifiable {
         borderMargin = try container.decodeIfPresent(CGFloat.self, forKey: .borderMargin) ?? 40
         manualBoundingBox = try container.decodeIfPresent(CGRect.self, forKey: .manualBoundingBox)
         showBoundingBox = try container.decodeIfPresent(Bool.self, forKey: .showBoundingBox) ?? true
+        isMultiExposure = try container.decodeIfPresent(Bool.self, forKey: .isMultiExposure) ?? false
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         modifiedAt = try container.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? Date()
     }
@@ -182,6 +186,7 @@ final class CollageProject: ObservableObject, Codable, Identifiable {
         try container.encode(borderMargin, forKey: .borderMargin)
         try container.encode(manualBoundingBox, forKey: .manualBoundingBox)
         try container.encode(showBoundingBox, forKey: .showBoundingBox)
+        try container.encode(isMultiExposure, forKey: .isMultiExposure)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(modifiedAt, forKey: .modifiedAt)
     }

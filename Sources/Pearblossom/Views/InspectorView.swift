@@ -59,7 +59,63 @@ struct InspectorView: View {
 
     // MARK: - Background Section
 
+    /// The allowed background colors in multi-exposure mode: white, black, transparent.
+    private static let multiExposureBackgrounds: [CodableColor] = [
+        .white, .black, .transparent
+    ]
+
     private func backgroundSection(_ binding: Binding<CollageProject>) -> some View {
+        // In multi-exposure mode, restrict to white/black/transparent only.
+        // Intermediate greys add a grey cast to the additive blend and don't make sense.
+        if binding.wrappedValue.isMultiExposure {
+            return AnyView(restrictedBackgroundSection(binding))
+        }
+        return AnyView(fullBackgroundSection(binding))
+    }
+
+    private func restrictedBackgroundSection(_ binding: Binding<CollageProject>) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Background")
+                .font(.headline)
+
+            Text("Multi-exposure works best with solid white, black, or transparent.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
+                ForEach(Self.multiExposureBackgrounds.indices, id: \.self) { index in
+                    let preset = Self.multiExposureBackgrounds[index]
+                    let isSelected = backgroundIsSelected(binding.wrappedValue.backgroundColor, preset)
+
+                    Button {
+                        binding.wrappedValue.backgroundColor = preset
+                        binding.wrappedValue.modifiedAt = Date()
+                    } label: {
+                        if preset.isTransparent {
+                            checkerboardSwatch(isSelected: isSelected)
+                        } else {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color(nsColor: NSColor(
+                                    calibratedRed: preset.red,
+                                    green: preset.green,
+                                    blue: preset.blue,
+                                    alpha: 1.0)))
+                                .aspectRatio(1, contentMode: .fit)
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 4)
+                                        .stroke(isSelected ? Color.accentColor : Color.gray.opacity(0.3), lineWidth: isSelected ? 3 : 1)
+                                )
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .help(presetLabel(preset))
+                }
+            }
+        }
+    }
+
+    private func fullBackgroundSection(_ binding: Binding<CollageProject>) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Background")
                 .font(.headline)
@@ -98,27 +154,7 @@ struct InspectorView: View {
                     binding.wrappedValue.backgroundColor = .transparent
                     binding.wrappedValue.modifiedAt = Date()
                 } label: {
-                    Canvas { context, size in
-                        let tileCount = 6
-                        let tileW = size.width / CGFloat(tileCount)
-                        let tileH = size.height / CGFloat(tileCount)
-                        for row in 0..<tileCount {
-                            for col in 0..<tileCount {
-                                let isWhite = (row + col) % 2 == 0
-                                let color: Color = isWhite ? .white : Color(NSColor(white: 0.82, alpha: 1.0))
-                                let rect = CGRect(
-                                    x: CGFloat(col) * tileW, y: CGFloat(row) * tileH,
-                                    width: tileW + 1, height: tileH + 1)
-                                context.fill(Path(rect), with: .color(color))
-                            }
-                        }
-                    }
-                    .aspectRatio(1, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 4)
-                            .stroke(isTransparent ? Color.accentColor : Color.gray.opacity(0.3), lineWidth: isTransparent ? 3 : 1)
-                    )
+                    checkerboardSwatch(isSelected: isTransparent)
                 }
                 .buttonStyle(.plain)
                 .help("Transparent")
@@ -126,11 +162,46 @@ struct InspectorView: View {
         }
     }
 
+    /// A checkerboard swatch used for the transparent background option.
+    private func checkerboardSwatch(isSelected: Bool) -> some View {
+        Canvas { context, size in
+            let tileCount = 6
+            let tileW = size.width / CGFloat(tileCount)
+            let tileH = size.height / CGFloat(tileCount)
+            for row in 0..<tileCount {
+                for col in 0..<tileCount {
+                    let isWhite = (row + col) % 2 == 0
+                    let color: Color = isWhite ? .white : Color(NSColor(white: 0.82, alpha: 1.0))
+                    let rect = CGRect(
+                        x: CGFloat(col) * tileW, y: CGFloat(row) * tileH,
+                        width: tileW + 1, height: tileH + 1)
+                    context.fill(Path(rect), with: .color(color))
+                }
+            }
+        }
+        .aspectRatio(1, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 4))
+        .overlay(
+            RoundedRectangle(cornerRadius: 4)
+                .stroke(isSelected ? Color.accentColor : Color.gray.opacity(0.3), lineWidth: isSelected ? 3 : 1)
+        )
+    }
+
     private func presetLabel(_ color: CodableColor) -> String {
         if color.red == 0 && color.green == 0 && color.blue == 0 { return "Black (0%)" }
         if color.red == 1 && color.green == 1 && color.blue == 1 { return "White (100%)" }
+        if color.isTransparent { return "Transparent" }
         let pct = Int(color.red * 100)
         return "\(pct)% Grey"
+    }
+
+    /// Checks whether `current` matches `preset` for the background picker selection highlight.
+    private func backgroundIsSelected(_ current: CodableColor, _ preset: CodableColor) -> Bool {
+        if preset.isTransparent { return current.isTransparent }
+        if current.isTransparent { return false }
+        return current.red == preset.red
+            && current.green == preset.green
+            && current.blue == preset.blue
     }
 
     // MARK: - Bounding Box Section
@@ -195,37 +266,44 @@ struct InspectorView: View {
     // MARK: - Shadow Section
 
     private func shadowSection(_ binding: Binding<CollageProject>) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Shadow")
-                .font(.headline)
-
-            let commonRadius = commonShadowRadius(binding.wrappedValue)
-
-            HStack {
-                Text("Radius:")
-                    .font(.body)
-                Slider(value: Binding<CGFloat>(
-                    get: { commonRadius },
-                    set: { newValue in
-                        binding.wrappedValue.layers.indices.forEach { i in
-                            binding.wrappedValue.layers[i].shadowRadius = newValue
-                        }
-                        binding.wrappedValue.modifiedAt = Date()
-                    }
-                ), in: 0...30, step: 1)
-                Text("\(Int(commonRadius)) px")
-                    .font(.body)
-                    .monospacedDigit()
-                    .foregroundColor(.secondary)
-                    .frame(width: 36, alignment: .trailing)
-            }
-
-            if commonRadius > 0 {
-                Text("Drop shadows increase the rendered bounds of each image.")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
+        // Shadows are meaningless in multi-exposure (additive blend) mode.
+        if binding.wrappedValue.isMultiExposure {
+            return AnyView(EmptyView())
         }
+
+        let commonRadius = commonShadowRadius(binding.wrappedValue)
+
+        return AnyView(
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Shadow")
+                    .font(.headline)
+
+                HStack {
+                    Text("Radius:")
+                        .font(.body)
+                    Slider(value: Binding<CGFloat>(
+                        get: { commonRadius },
+                        set: { newValue in
+                            binding.wrappedValue.layers.indices.forEach { i in
+                                binding.wrappedValue.layers[i].shadowRadius = newValue
+                            }
+                            binding.wrappedValue.modifiedAt = Date()
+                        }
+                    ), in: 0...30, step: 1)
+                    Text("\(Int(commonRadius)) px")
+                        .font(.body)
+                        .monospacedDigit()
+                        .foregroundColor(.secondary)
+                        .frame(width: 36, alignment: .trailing)
+                }
+
+                if commonRadius > 0 {
+                    Text("Drop shadows increase the rendered bounds of each image.")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+        )
     }
 
     /// Returns the most common shadowRadius across all layers (mode), or 0 if none.
@@ -293,6 +371,17 @@ struct InspectorView: View {
             Text("Bounding box: \(Int(bb.width)) × \(Int(bb.height)) pt")
                 .font(.caption)
                 .foregroundColor(.secondary)
+
+            if project.isMultiExposure {
+                HStack(spacing: 4) {
+                    Image(systemName: "camera.fill")
+                        .font(.caption)
+                    Text("Multi-Exposure")
+                        .font(.caption)
+                }
+                .foregroundColor(.accentColor)
+                .padding(.top, 2)
+            }
         }
     }
 

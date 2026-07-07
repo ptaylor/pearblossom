@@ -86,6 +86,7 @@ Stored as `<name>.collage.json` in the `Collages/` directory.
 | `borderMargin` | Number | No | `40` | Margin in points for defined-border mode |
 | `manualBoundingBox` | Rect | No | null | User-defined bounding box (manual mode only) |
 | `showBoundingBox` | Bool | No | `true` | Whether the bounding box guide is visible |
+| `isMultiExposure` | Bool | No | `false` | Whether photos blend equally (camera multi-exposure). Immutable after creation |
 | `createdAt` | ISO 8601 date | Yes | now | Creation timestamp |
 | `modifiedAt` | ISO 8601 date | Yes | now | Last modification timestamp |
 
@@ -162,6 +163,7 @@ Serialized as `[x, y, width, height]` (origin + size). Used for `manualBoundingB
   "boundingBoxMode": "definedBorder",
   "borderMargin": 40,
   "showBoundingBox": true,
+  "isMultiExposure": false,
   "createdAt": "2026-07-03T14:00:00Z",
   "modifiedAt": "2026-07-03T14:05:00Z"
 }
