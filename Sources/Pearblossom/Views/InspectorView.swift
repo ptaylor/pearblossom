@@ -49,7 +49,7 @@ struct InspectorView: View {
                 Spacer()
             }
         }
-        .frame(minWidth: 240)
+        .frame(minWidth: 260)
         .sheet(isPresented: $showExportSheet) {
             if let proj = project {
                 ExportSettingsView(project: proj)
@@ -224,23 +224,30 @@ struct InspectorView: View {
             }
 
             if binding.wrappedValue.boundingBoxMode == .definedBorder {
-                HStack {
-                    Text("Margin:")
-                        .font(.body)
+                VStack(alignment: .leading, spacing: 4) {
                     Slider(value: binding.borderMargin, in: 0...200, step: 5)
                         .onChange(of: binding.wrappedValue.borderMargin) { _, _ in
                             binding.wrappedValue.modifiedAt = Date()
                         }
-                    Text("\(Int(binding.wrappedValue.borderMargin)) px")
-                        .font(.body)
-                        .monospacedDigit()
-                        .foregroundColor(.secondary)
-                        .frame(width: 40, alignment: .trailing)
+                    HStack {
+                        Text("Margin")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text("\(Int(binding.wrappedValue.borderMargin)) px")
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundColor(.secondary)
+                    }
                 }
-            } else {
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
+            if binding.wrappedValue.boundingBoxMode == .manual {
                 Text("Drag the edges of the bounding box on the canvas to resize.")
                     .font(.caption)
                     .foregroundColor(.secondary)
+                    .transition(.move(edge: .top).combined(with: .opacity))
             }
 
             Button {
@@ -274,33 +281,35 @@ struct InspectorView: View {
             return AnyView(EmptyView())
         }
 
-        let commonRadius = commonShadowRadius(binding.wrappedValue)
-
         return AnyView(
             VStack(alignment: .leading, spacing: 8) {
                 Text("Shadow")
                     .font(.headline)
 
-                HStack {
-                    Text("Radius:")
-                        .font(.body)
+                VStack(alignment: .leading, spacing: 4) {
                     Slider(value: Binding<CGFloat>(
-                        get: { commonRadius },
+                        get: { commonShadowRadius(binding.wrappedValue) },
                         set: { newValue in
+                            guard !binding.wrappedValue.layers.isEmpty else { return }
                             binding.wrappedValue.layers.indices.forEach { i in
                                 binding.wrappedValue.layers[i].shadowRadius = newValue
                             }
                             binding.wrappedValue.modifiedAt = Date()
                         }
                     ), in: 0...30, step: 1)
-                    Text("\(Int(commonRadius)) px")
-                        .font(.body)
-                        .monospacedDigit()
-                        .foregroundColor(.secondary)
-                        .frame(width: 36, alignment: .trailing)
+                    HStack {
+                        Text("Radius")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                        Text("\(Int(commonShadowRadius(binding.wrappedValue))) px")
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundColor(.secondary)
+                    }
                 }
 
-                if commonRadius > 0 {
+                if commonShadowRadius(binding.wrappedValue) > 0 {
                     Text("Drop shadows increase the rendered bounds of each image.")
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -309,13 +318,10 @@ struct InspectorView: View {
         )
     }
 
-    /// Returns the most common shadowRadius across all layers (mode), or 0 if none.
+    /// Returns the shadow radius from the first layer (all layers share the same
+    /// value since the slider sets them in unison), or 0 if there are no layers.
     private func commonShadowRadius(_ project: CollageProject) -> CGFloat {
-        guard !project.layers.isEmpty else { return 0 }
-        let radii = project.layers.map { $0.shadowRadius }
-        // Find the most frequent value
-        let grouped = Dictionary(grouping: radii, by: { $0 })
-        return grouped.max(by: { $0.value.count < $1.value.count })?.key ?? 0
+        return project.layers.first?.shadowRadius ?? 0
     }
 
     // MARK: - Zoom Section
@@ -325,37 +331,38 @@ struct InspectorView: View {
             Text("Zoom")
                 .font(.headline)
 
-            HStack(spacing: 4) {
-                Button {
-                    let newMag = max(magnification - 0.25, 0.1)
-                    magnification = newMag
-                } label: {
-                    Image(systemName: "minus.magnifyingglass")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .help("Zoom Out (⌘–)")
-
+            VStack(alignment: .leading, spacing: 6) {
                 Slider(value: $magnification, in: 0.1...5.0, step: 0.05)
                     .help("Zoom Level")
 
-                Button {
-                    let newMag = min(magnification + 0.25, 5.0)
-                    magnification = newMag
-                } label: {
-                    Image(systemName: "plus.magnifyingglass")
-                }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
-                .help("Zoom In (⌘+)")
-            }
+                HStack {
+                    Text("\(Int(magnification * 100))%")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .monospacedDigit()
 
-            HStack {
-                Spacer()
-                Text("\(Int(magnification * 100))%")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .monospacedDigit()
+                    Spacer()
+
+                    Button {
+                        let newMag = max(magnification - 0.25, 0.1)
+                        magnification = newMag
+                    } label: {
+                        Image(systemName: "minus.magnifyingglass")
+                    }
+                    .buttonStyle(.borderless)
+                    .controlSize(.small)
+                    .help("Zoom Out (⌘–)")
+
+                    Button {
+                        let newMag = min(magnification + 0.25, 5.0)
+                        magnification = newMag
+                    } label: {
+                        Image(systemName: "plus.magnifyingglass")
+                    }
+                    .buttonStyle(.borderless)
+                    .controlSize(.small)
+                    .help("Zoom In (⌘+)")
+                }
             }
         }
     }

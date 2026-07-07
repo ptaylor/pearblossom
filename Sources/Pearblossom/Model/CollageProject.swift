@@ -30,10 +30,9 @@ final class CollageProject: ObservableObject, Codable, Identifiable {
     /// Computes the effective bounding box based on mode and layer positions.
     /// Pure getter — does not mutate state.
     func effectiveBoundingBox() -> CGRect {
-        let canvasRect = CGRect(x: 0, y: 0, width: canvasWidth, height: canvasHeight)
         switch boundingBoxMode {
         case .manual:
-            return manualBoundingBox ?? canvasRect
+            return manualBoundingBox ?? computeDefinedBorderBox()
         case .definedBorder:
             return computeDefinedBorderBox()
         }
