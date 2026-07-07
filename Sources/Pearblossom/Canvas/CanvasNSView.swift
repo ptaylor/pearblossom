@@ -47,7 +47,8 @@ final class CanvasNSView: NSView {
     var onLayersChanged: (() -> Void)?
 
     private var selectedLayerIDs = Set<UUID>()
-    private var dragOffset: CGPoint = .zero
+    private var moveStartPositions: [UUID: CGPoint] = [:]  // initial position of each selected layer
+    private var moveStartPoint: CGPoint = .zero            // mouse location at move start
 
     // MARK: - Interaction State
 
@@ -776,10 +777,22 @@ final class CanvasNSView: NSView {
             if event.modifierFlags.contains(.shift) {
                 if selectedLayerIDs.contains(layer.id) { selectedLayerIDs.remove(layer.id) }
                 else { selectedLayerIDs.insert(layer.id) }
-            } else {
+            } else if !selectedLayerIDs.contains(layer.id) {
+                // Click on a non-selected layer — make it the only selection
                 selectedLayerIDs = [layer.id]
             }
-            dragOffset = CGPoint(x: point.x - layer.position.x, y: point.y - layer.position.y)
+            // If the clicked layer is already selected, preserve multi-selection
+            // so the user can move all selected layers together.
+            // Capture initial positions of all selected layers and the anchor point
+            moveStartPoint = point
+            moveStartPositions = [:]
+            if let proj = project {
+                for id in selectedLayerIDs {
+                    if let l = proj.layers.first(where: { $0.id == id }) {
+                        moveStartPositions[id] = l.position
+                    }
+                }
+            }
             interactionMode = .moving
             needsDisplay = true
             return
@@ -883,10 +896,15 @@ final class CanvasNSView: NSView {
             needsDisplay = true
 
         case .moving:
-            guard !selectedLayerIDs.isEmpty, var proj = project else { return }
+            guard !selectedLayerIDs.isEmpty, let proj = project else { return }
+            let delta = CGPoint(x: point.x - moveStartPoint.x, y: point.y - moveStartPoint.y)
             for id in selectedLayerIDs {
-                if let index = proj.layers.firstIndex(where: { $0.id == id }) {
-                    proj.layers[index].position = CGPoint(x: point.x - dragOffset.x, y: point.y - dragOffset.y)
+                if let index = proj.layers.firstIndex(where: { $0.id == id }),
+                   let startPos = moveStartPositions[id] {
+                    proj.layers[index].position = CGPoint(
+                        x: startPos.x + delta.x,
+                        y: startPos.y + delta.y
+                    )
                 }
             }
             project = proj
