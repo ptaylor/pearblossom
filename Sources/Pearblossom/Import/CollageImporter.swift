@@ -90,7 +90,9 @@ enum CollageImporter {
                 photoID: photo.id,
                 position: position,
                 size: size,
-                rotation: node.theta,
+                // Picasa stores theta in a y-down screen convention; Pearblossom's
+                // renderer applies positive rotation clockwise on screen, so negate.
+                rotation: -node.theta,
                 zOrder: zOrder,
                 opacity: node.alpha ?? 1.0,
                 sourceResolution: sourceResolution,
