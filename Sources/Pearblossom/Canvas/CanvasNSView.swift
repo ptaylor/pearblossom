@@ -298,12 +298,11 @@ final class CanvasNSView: NSView {
         }
     }
 
-    /// Multi-exposure compositing: each photo at 1/N opacity, added together.
-    /// This mimics camera multi-exposure where each frame contributes equally.
-    /// Shadows are skipped (meaningless with additive blend).
+    /// Multi-exposure compositing: source-over (Over Operator) blending so the
+    /// result matches Picasa. Each layer honors explicit per-node alpha;
+    /// otherwise layers blend equally at 1/N.
     private func renderMultiExposureLayers(_ proj: CollageProject, sorted: [PhotoLayer], canvasH: CGFloat, in cgContext: CGContext) {
-        let n = CGFloat(max(sorted.count, 1))
-        let meOpacity = 1.0 / n
+        let defaultAlpha = 1.0 / Double(max(sorted.count, 1))
         var composite: CIImage?
 
         for layer in sorted {
@@ -346,18 +345,19 @@ final class CanvasNSView: NSView {
                 y: canvasH - layer.position.y - halfH
             ))
 
-            // Apply equal-blend opacity: 1/N
+            // Effective alpha: honor explicit per-node alpha; default to equal 1/N.
+            let alpha = layer.opacity < 1.0 ? layer.opacity : defaultAlpha
             let f = CIFilter(name: "CIColorMatrix")!
             f.setValue(t, forKey: kCIInputImageKey)
-            f.setValue(CIVector(x: 0, y: 0, z: 0, w: meOpacity), forKey: "inputAVector")
+            f.setValue(CIVector(x: 0, y: 0, z: 0, w: alpha), forKey: "inputAVector")
             t = f.outputImage ?? t
 
-            // Additive composite (order-independent, shadows skipped)
+            // Source-over composite (Over Operator), matching Picasa multiexp.
             if let existing = composite {
-                let add = CIFilter(name: "CIAdditionCompositing")!
-                add.setValue(t, forKey: kCIInputImageKey)
-                add.setValue(existing, forKey: kCIInputBackgroundImageKey)
-                composite = add.outputImage
+                let over = CIFilter(name: "CISourceOverCompositing")!
+                over.setValue(t, forKey: kCIInputImageKey)
+                over.setValue(existing, forKey: kCIInputBackgroundImageKey)
+                composite = over.outputImage
             } else {
                 composite = t
             }

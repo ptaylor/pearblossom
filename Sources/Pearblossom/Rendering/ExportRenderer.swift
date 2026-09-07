@@ -255,9 +255,9 @@ enum ExportRenderer {
         return composite.cropped(to: CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight))
     }
 
-    /// Builds a multi-exposure composite: each photo at 1/N opacity composited
-    /// additively over black. If the project background is white, the result is
-    /// then source-over composited onto a white fill so uncovered areas show white.
+    /// Builds a multi-exposure composite using source-over (Over Operator) blending
+    /// so imported Picasa collages match. Layers honor explicit per-node alpha;
+    /// otherwise they blend equally at 1/N. Shadows are skipped.
     private static func buildMultiExposureComposite(
         project: CollageProject,
         scaleX: CGFloat,
@@ -267,15 +267,13 @@ enum ExportRenderer {
         outputHeight: CGFloat
     ) -> CIImage? {
         let layers = project.layers
-        let n = CGFloat(max(layers.count, 1))
-        let meOpacity = 1.0 / n
+        let defaultAlpha = 1.0 / Double(max(layers.count, 1))
 
-        // Start with black fill (addition over black = pure average)
-        let blackGen = CIFilter(name: "CIConstantColorGenerator")!
-        blackGen.setValue(CIColor(red: 0, green: 0, blue: 0, alpha: 1), forKey: kCIInputColorKey)
-        var composite = blackGen.outputImage!.cropped(to: CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight))
+        // Fill with the project background color.
+        let colorGen = CIFilter(name: "CIConstantColorGenerator")!
+        colorGen.setValue(CIColor(cgColor: project.backgroundColor.cgColor), forKey: kCIInputColorKey)
+        var composite = colorGen.outputImage!.cropped(to: CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight))
 
-        // Sort for determinism only — addition is commutative
         let sorted = layers.sorted { $0.zOrder < $1.zOrder }
 
         for layer in sorted {
@@ -305,33 +303,18 @@ enum ExportRenderer {
             let exportY = outputHeight - (layer.position.y - boundingBox.origin.y) * scaleY - halfH
             t = t.transformed(by: CGAffineTransform(translationX: exportX, y: exportY))
 
-            // Apply equal-blend opacity (1/N). Skip shadows.
+            // Effective alpha: honor explicit per-node alpha; default to equal 1/N.
+            let alpha = layer.opacity < 1.0 ? CGFloat(layer.opacity) : CGFloat(defaultAlpha)
             let mat = CIFilter(name: "CIColorMatrix")!
             mat.setValue(t, forKey: kCIInputImageKey)
-            mat.setValue(CIVector(x: 0, y: 0, z: 0, w: meOpacity), forKey: "inputAVector")
+            mat.setValue(CIVector(x: 0, y: 0, z: 0, w: alpha), forKey: "inputAVector")
             t = mat.outputImage ?? t
 
-            let add = CIFilter(name: "CIAdditionCompositing")!
-            add.setValue(t, forKey: kCIInputImageKey)
-            add.setValue(composite, forKey: kCIInputBackgroundImageKey)
-            if let result = add.outputImage {
-                composite = result
-            }
-        }
-
-        // If the project background is white, composite the additive result
-        // over a white fill so uncovered areas show white instead of black.
-        if !project.backgroundColor.isTransparent
-           && project.backgroundColor.red >= 0.99
-           && project.backgroundColor.green >= 0.99
-           && project.backgroundColor.blue >= 0.99 {
-            let whiteGen = CIFilter(name: "CIConstantColorGenerator")!
-            whiteGen.setValue(CIColor(red: 1, green: 1, blue: 1, alpha: 1), forKey: kCIInputColorKey)
-            let whiteBg = whiteGen.outputImage!.cropped(to: CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight))
-            let f = CIFilter(name: "CISourceOverCompositing")!
-            f.setValue(composite, forKey: kCIInputImageKey)
-            f.setValue(whiteBg, forKey: kCIInputBackgroundImageKey)
-            if let result = f.outputImage {
+            // Source-over composite (Over Operator), matching Picasa multiexp.
+            let over = CIFilter(name: "CISourceOverCompositing")!
+            over.setValue(t, forKey: kCIInputImageKey)
+            over.setValue(composite, forKey: kCIInputBackgroundImageKey)
+            if let result = over.outputImage {
                 composite = result
             }
         }

@@ -424,6 +424,10 @@ struct InspectorView: View {
 extension Notification.Name {
     /// Posted to open the Export sheet (from the menu bar).
     static let triggerExport = Notification.Name("PearblossomTriggerExport")
+    /// Posted to open the Picasa collage (.cxf) importer.
+    static let triggerImportCollage = Notification.Name("PearblossomTriggerImportCollage")
+    /// Posted when the set of collages changes (e.g. after a Picasa import).
+    static let collagesDidChange = Notification.Name("PearblossomCollagesDidChange")
     /// Posted when photos are dropped on a blank canvas. UserInfo: paths, point, name, description.
     static let blankCanvasDrop = Notification.Name("PearblossomBlankCanvasDrop")
     /// Posted to re-trigger a photo drop after a new collage has been created.

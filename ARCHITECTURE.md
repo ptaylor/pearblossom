@@ -116,6 +116,7 @@ Sidecar `.collection.json` lives in the collection folder alongside the photos.
 
 - **v1**: Hard edges only. Each photo is an opaque rectangle (or optionally cropped). Overlap determined solely by z-order.
 - **Opacity**: Supported in v1. Core Image alpha compositing based on `opacity` property.
+- **Multi-exposure**: When `isMultiExposure` is true, layers composite with source-over (Over Operator) blending. Each layer uses its `opacity` when explicitly set (Picasa per-node alpha), otherwise an equal 1/N blend. Shadows are skipped.
 - **v2 roadmap**: Soft-edge feathering (`featherRadius`), blend modes (`blendMode`)
 
 ### 5. Rendering Pipeline (Core Image)
@@ -209,6 +210,14 @@ protocol Command: Codable {
 
 - **v1**: Absolute paths stored. If a photo is missing at load time, show a red placeholder rectangle on canvas with the filename. Offer "Locate Photo…" context menu item.
 - **v2 roadmap**: Optional "Copy files into collection folder on import" toggle. Relative path resolution fallback.
+
+#### 7.5 Picasa Collage Import (`.cxf`)
+
+- Triggered from File → Import Collage… or the Collages toolbar. Only `theme="multiexp"` and `theme="picturepile"` are supported; any other theme is rejected with an error.
+- Parsing lives in `Import/CXFDocument.swift` (Foundation `XMLParser`); WINE → macOS path translation in `Import/WinePathTranslator.swift` (see `SPEC_wine.md`); orchestration in `Import/CollageImporter.swift`.
+- Import creates a `CollageProject` and a matching `PhotoCollection` (same name) atomically. The name is suggested from the file stem and validated against both `Collages/` and `Collections/` for clashes; the dialog blocks on any clash.
+- `multiexp` → `isMultiExposure = true`, per-node `alpha` stored as layer `opacity`. `picturepile` → normal collage, with `shadowRadius` applied to shadowed/whiteframe nodes (white borders are not reproduced).
+- Source photos are referenced in place (`.reference`), never copied. Missing files are skipped and reported. Canvas size is derived from the `format` ratio (2000 pt long side); background from the AARRGGBB `<background color>`.
 
 ### 8. Window Layout
 

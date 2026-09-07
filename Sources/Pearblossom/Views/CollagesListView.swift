@@ -58,6 +58,13 @@ struct CollagesListView: View {
                 .help("New Collage")
 
                 Button {
+                    NotificationCenter.default.post(name: .triggerImportCollage, object: nil)
+                } label: {
+                    Image(systemName: "doc.badge.plus")
+                }
+                .help("Import Picasa Collage (.cxf)")
+
+                Button {
                     loadCollages()
                     Logger.debug("Collages list refreshed")
                 } label: {
@@ -127,6 +134,9 @@ struct CollagesListView: View {
         .onAppear {
             loadCollages()
             Logger.debug("CollagesListView appeared, loaded \(collages.count) collage(s)")
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .collagesDidChange)) { _ in
+            loadCollages()
         }
         .sheet(isPresented: $showNewCollageSheet) {
             NewCollageDialog { newCollage in

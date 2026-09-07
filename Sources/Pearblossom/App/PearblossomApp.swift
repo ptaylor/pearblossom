@@ -52,6 +52,11 @@ struct PearblossomApp: App {
                 }
                 .keyboardShortcut("i", modifiers: [.command, .shift])
 
+                Button("Import Collage…") {
+                    NotificationCenter.default.post(name: .triggerImportCollage, object: nil)
+                }
+                .keyboardShortcut("i", modifiers: [.command, .option])
+
                 Divider()
 
                 Button("Export Collage…") {
