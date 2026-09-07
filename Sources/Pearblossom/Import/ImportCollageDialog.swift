@@ -11,6 +11,7 @@ struct ImportCollageDialog: View {
     @State private var name: String
     @State private var description: String = ""
     @State private var theme: String? = nil
+    @State private var importMode: ImportMode = .reference
     @State private var nameError: String? = nil
     @State private var isImporting = false
 
@@ -60,6 +61,25 @@ struct ImportCollageDialog: View {
 
                 TextField("Optional", text: $description)
                     .textFieldStyle(.roundedBorder)
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Photo Files")
+                    .font(.callout)
+                    .foregroundColor(.secondary)
+
+                Picker("Photo Files", selection: $importMode) {
+                    Text("Link files (reference in place)").tag(ImportMode.reference)
+                    Text("Copy files into collection").tag(ImportMode.copy)
+                }
+                .pickerStyle(.radioGroup)
+
+                Text(importMode == .copy
+                     ? "Source photos will be copied into the new collection folder."
+                     : "Source photos will be linked at their current location.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Text("A collage and a matching photo collection will be created.")
@@ -147,13 +167,15 @@ struct ImportCollageDialog: View {
 
         isImporting = true
         let descriptionText = description.trimmingCharacters(in: .whitespaces)
+        let mode = importMode
 
         DispatchQueue.global(qos: .userInitiated).async {
             do {
                 let result = try CollageImporter.importCollage(
                     from: cxfURL,
                     name: trimmed,
-                    description: descriptionText
+                    description: descriptionText,
+                    importMode: mode
                 )
                 let (project, collection) = try persist(result, name: trimmed)
 
@@ -184,6 +206,19 @@ struct ImportCollageDialog: View {
         var collection = result.collection
         collection.folderPath = folderURL.path
         collection.modifiedAt = Date()
+
+        // Copy source photos into the collection folder when requested.
+        for index in collection.photos.indices {
+            guard collection.importMode == .copy else { break }
+            guard let source = result.copySources[collection.photos[index].id] else { continue }
+
+            let destinationURL = folderURL.appendingPathComponent(collection.photos[index].path)
+            if (try? fm.copyItem(at: URL(fileURLWithPath: source), to: destinationURL)) == nil {
+                // Copy failed — fall back to referencing the original file in place.
+                Logger.warn("Picasa import: failed to copy '\(source)', referencing in place")
+                collection.photos[index].path = source
+            }
+        }
 
         // Generate thumbnails eagerly so the collection browser is ready immediately.
         for index in collection.photos.indices {

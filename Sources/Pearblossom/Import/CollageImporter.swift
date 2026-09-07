@@ -9,6 +9,8 @@ enum CollageImporter {
         let project: CollageProject
         let collection: PhotoCollection
         let skippedSources: [String]
+        /// For `.copy` mode: absolute source path for each copied photo, keyed by photo id.
+        let copySources: [UUID: String]
     }
 
     /// Parses and converts a `.cxf` file into in-memory models.
@@ -16,8 +18,9 @@ enum CollageImporter {
     ///   - cxfURL: The `.cxf` file on disk.
     ///   - name: Display name for the new collage and collection.
     ///   - description: Optional description for both.
+    ///   - importMode: Link source photos (`.reference`) or copy them into the collection (`.copy`).
     /// - Returns: The new project + collection (not yet written to disk), plus skipped source paths.
-    static func importCollage(from cxfURL: URL, name: String, description: String) throws -> ImportResult {
+    static func importCollage(from cxfURL: URL, name: String, description: String, importMode: ImportMode = .reference) throws -> ImportResult {
         let data = try Data(contentsOf: cxfURL)
         let collage = try CXFParser.parse(data)
 
@@ -28,6 +31,8 @@ enum CollageImporter {
         var photosByPath: [String: CollectionPhoto] = [:]
         var photoOrder: [String] = []
         var skipped: [String] = []
+        var copySources: [UUID: String] = [:]
+        var usedDestinationNames = Set<String>()
 
         for node in collage.nodes {
             guard let rawSource = node.src else { continue }
@@ -42,7 +47,15 @@ enum CollageImporter {
                 continue
             }
             if photosByPath[resolved] == nil {
-                photosByPath[resolved] = CollectionPhoto(path: resolved)
+                let photo: CollectionPhoto
+                if importMode == .copy {
+                    let destinationName = destinationFilename(for: resolved, used: &usedDestinationNames)
+                    photo = CollectionPhoto(path: destinationName)
+                    copySources[photo.id] = resolved
+                } else {
+                    photo = CollectionPhoto(path: resolved)
+                }
+                photosByPath[resolved] = photo
                 photoOrder.append(resolved)
             }
         }
@@ -52,7 +65,7 @@ enum CollageImporter {
             description: description,
             folderPath: nil,
             photos: photoOrder.map { photosByPath[$0]! },
-            importMode: .reference,
+            importMode: importMode,
             createdAt: Date(),
             modifiedAt: Date()
         )
@@ -102,7 +115,7 @@ enum CollageImporter {
         )
 
         Logger.debug("Picasa import: parsed '\(name)' — theme=\(collage.theme), \(layers.count) layer(s), \(collection.photos.count) unique photo(s), \(skipped.count) skipped")
-        return ImportResult(project: project, collection: collection, skippedSources: skipped)
+        return ImportResult(project: project, collection: collection, skippedSources: skipped, copySources: copySources)
     }
 
     // MARK: - Helpers
@@ -127,6 +140,23 @@ enum CollageImporter {
     private static func parseBackground(_ background: CXFBackground?) -> CodableColor {
         guard let hex = background?.color else { return .white }
         return CodableColor(argbHex: hex) ?? .white
+    }
+
+    /// Returns a collision-free destination filename for a copied photo.
+    private static func destinationFilename(for source: String, used: inout Set<String>) -> String {
+        let sourceURL = URL(fileURLWithPath: source)
+        let original = sourceURL.lastPathComponent
+        let ext = sourceURL.pathExtension
+        let base = (original as NSString).deletingPathExtension
+
+        var candidate = original
+        var counter = 2
+        while used.contains(candidate) {
+            candidate = ext.isEmpty ? "\(base) \(counter)" : "\(base) \(counter).\(ext)"
+            counter += 1
+        }
+        used.insert(candidate)
+        return candidate
     }
 
     /// Decides whether a node gets a drop shadow. Only picturepile renders shadows.

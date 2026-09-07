@@ -217,7 +217,7 @@ protocol Command: Codable {
 - Parsing lives in `Import/CXFDocument.swift` (Foundation `XMLParser`); WINE → macOS path translation in `Import/WinePathTranslator.swift` (see `SPEC_wine.md`); orchestration in `Import/CollageImporter.swift`.
 - Import creates a `CollageProject` and a matching `PhotoCollection` (same name) atomically. The name is suggested from the file stem and validated against both `Collages/` and `Collections/` for clashes; the dialog blocks on any clash.
 - `multiexp` → `isMultiExposure = true`, per-node `alpha` stored as layer `opacity`. `picturepile` → normal collage, with `shadowRadius` applied to shadowed/whiteframe nodes (white borders are not reproduced).
-- Source photos are referenced in place (`.reference`), never copied. Missing files are skipped and reported. Canvas size is derived from the `format` ratio (2000 pt long side); background from the AARRGGBB `<background color>`.
+- Source photos are linked in place by default (`.reference`) or copied into the collection (`.copy`) via an import-dialog option. Missing files are skipped and reported. Canvas size is derived from the `format` ratio (2000 pt long side); background from the AARRGGBB `<background color>`.
 
 ### 8. Window Layout
 
