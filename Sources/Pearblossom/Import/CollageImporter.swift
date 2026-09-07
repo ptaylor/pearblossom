@@ -83,13 +83,13 @@ enum CollageImporter {
             let size = CGSize(width: node.w * Double(canvasW), height: node.h * Double(canvasH))
             // Picasa stores (x, y) as the photo's top-left corner. Reproduce its
             // layout: the rotation is negated (Pearblossom positive = clockwise)
-            // and the stored center is offset by R_cw(theta) * (w/2, h/2).
+            // and the stored center is offset by the rotated half-extents.
             let halfW = size.width / 2
             let halfH = size.height / 2
             let cosTheta = cos(node.theta)
             let sinTheta = sin(node.theta)
             let centerX = node.x * Double(canvasW) + Double(halfW) * cosTheta - Double(halfH) * sinTheta
-            let centerY = node.y * Double(canvasH) + Double(halfW) * sinTheta + Double(halfH) * cosTheta
+            let centerY = node.y * Double(canvasH) + Double(halfH) * sinTheta + Double(halfH) * cosTheta
             let position = CGPoint(x: centerX, y: centerY)
             let sourceResolution = imageDimensions(at: resolved) ?? .zero
 
