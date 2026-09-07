@@ -81,7 +81,16 @@ enum CollageImporter {
             }
 
             let size = CGSize(width: node.w * Double(canvasW), height: node.h * Double(canvasH))
-            let position = CGPoint(x: node.x * Double(canvasW), y: node.y * Double(canvasH))
+            // Picasa stores (x, y) as the photo's top-left corner and rotates
+            // clockwise around that corner. Pearblossom stores the rotated photo's
+            // center, so convert: center = topLeft + R_cw(theta) * (w/2, h/2).
+            let halfW = size.width / 2
+            let halfH = size.height / 2
+            let cosTheta = cos(node.theta)
+            let sinTheta = sin(node.theta)
+            let centerX = node.x * Double(canvasW) + Double(halfW) * cosTheta - Double(halfH) * sinTheta
+            let centerY = node.y * Double(canvasH) + Double(halfW) * sinTheta + Double(halfH) * cosTheta
+            let position = CGPoint(x: centerX, y: centerY)
             let sourceResolution = imageDimensions(at: resolved) ?? .zero
 
             let layer = PhotoLayer(
@@ -90,9 +99,9 @@ enum CollageImporter {
                 photoID: photo.id,
                 position: position,
                 size: size,
-                // Picasa stores theta in a y-down screen convention; Pearblossom's
-                // renderer applies positive rotation clockwise on screen, so negate.
-                rotation: -node.theta,
+                // Picasa rotates clockwise; Pearblossom renders positive rotation
+                // clockwise too, so use theta as-is.
+                rotation: node.theta,
                 zOrder: zOrder,
                 opacity: node.alpha ?? 1.0,
                 sourceResolution: sourceResolution,
