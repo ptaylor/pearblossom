@@ -64,7 +64,9 @@ final class CollageProject: ObservableObject, Codable, Identifiable {
             )
             result = result?.union(layerRect) ?? layerRect
         } ?? canvasRect
-        return unionRect.insetBy(dx: -borderMargin, dy: -borderMargin)
+        // Multi-exposure photos fill the canvas edge-to-edge (like Picasa);
+        // the border margin does not apply.
+        return isMultiExposure ? unionRect : unionRect.insetBy(dx: -borderMargin, dy: -borderMargin)
     }
 
     // MARK: - Layer Reordering

@@ -86,7 +86,7 @@ Stored as `<name>.collage.json` in the `Collages/` directory.
 | `borderMargin` | Number | No | `40` | Margin in points for defined-border mode |
 | `manualBoundingBox` | Rect | No | null | User-defined bounding box (manual mode only) |
 | `showBoundingBox` | Bool | No | `true` | Whether the bounding box guide is visible |
-| `isMultiExposure` | Bool | No | `false` | Whether photos blend equally (camera multi-exposure). Immutable after creation |
+| `isMultiExposure` | Bool | No | `false` | Whether photos blend as a multi-exposure composite (1/N opacity over black). Immutable after creation |
 | `createdAt` | ISO 8601 date | Yes | now | Creation timestamp |
 | `modifiedAt` | ISO 8601 date | Yes | now | Last modification timestamp |
 

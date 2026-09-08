@@ -21,8 +21,10 @@ struct InspectorView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     if let binding = Binding($project) {
-                        backgroundSection(binding)
-                        Divider()
+                        if !binding.wrappedValue.isMultiExposure {
+                            backgroundSection(binding)
+                            Divider()
+                        }
                         boundingBoxSection(binding)
                         Divider()
                         shadowSection(binding)
@@ -55,60 +57,8 @@ struct InspectorView: View {
 
     // MARK: - Background Section
 
-    /// The allowed background colors in multi-exposure mode: white, black, transparent.
-    private static let multiExposureBackgrounds: [CodableColor] = [
-        .white, .black, .transparent
-    ]
-
     private func backgroundSection(_ binding: Binding<CollageProject>) -> some View {
-        // In multi-exposure mode, restrict to white/black/transparent only.
-        // Intermediate greys add a grey cast to the additive blend and don't make sense.
-        if binding.wrappedValue.isMultiExposure {
-            return AnyView(restrictedBackgroundSection(binding))
-        }
-        return AnyView(fullBackgroundSection(binding))
-    }
-
-    private func restrictedBackgroundSection(_ binding: Binding<CollageProject>) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Background")
-                .font(.headline)
-
-            Text("Multi-exposure works best with solid white, black, or transparent.")
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 3), spacing: 6) {
-                ForEach(Self.multiExposureBackgrounds.indices, id: \.self) { index in
-                    let preset = Self.multiExposureBackgrounds[index]
-                    let isSelected = backgroundIsSelected(binding.wrappedValue.backgroundColor, preset)
-
-                    Button {
-                        binding.wrappedValue.backgroundColor = preset
-                        binding.wrappedValue.modifiedAt = Date()
-                    } label: {
-                        if preset.isTransparent {
-                            checkerboardSwatch(isSelected: isSelected)
-                        } else {
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(Color(nsColor: NSColor(
-                                    calibratedRed: preset.red,
-                                    green: preset.green,
-                                    blue: preset.blue,
-                                    alpha: 1.0)))
-                                .aspectRatio(1, contentMode: .fit)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 4)
-                                        .stroke(isSelected ? Color.accentColor : Color.gray.opacity(0.3), lineWidth: isSelected ? 3 : 1)
-                                )
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .help(presetLabel(preset))
-                }
-            }
-        }
+        fullBackgroundSection(binding)
     }
 
     private func fullBackgroundSection(_ binding: Binding<CollageProject>) -> some View {
@@ -189,15 +139,6 @@ struct InspectorView: View {
         if color.isTransparent { return "Transparent" }
         let pct = Int(color.red * 100)
         return "\(pct)% Grey"
-    }
-
-    /// Checks whether `current` matches `preset` for the background picker selection highlight.
-    private func backgroundIsSelected(_ current: CodableColor, _ preset: CodableColor) -> Bool {
-        if preset.isTransparent { return current.isTransparent }
-        if current.isTransparent { return false }
-        return current.red == preset.red
-            && current.green == preset.green
-            && current.blue == preset.blue
     }
 
     // MARK: - Bounding Box Section

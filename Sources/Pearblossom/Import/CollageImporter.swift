@@ -120,7 +120,7 @@ enum CollageImporter {
             canvasHeight: canvasH,
             backgroundColor: background,
             layers: layers,
-            borderMargin: AppSettings.shared.defaultBorderMargin,
+            borderMargin: collage.theme == "multiexp" ? 0 : AppSettings.shared.defaultBorderMargin,
             isMultiExposure: collage.theme == "multiexp",
             createdAt: Date(),
             modifiedAt: Date()

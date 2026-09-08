@@ -269,9 +269,10 @@ enum ExportRenderer {
         let layers = project.layers
         let defaultAlpha = 1.0 / Double(max(layers.count, 1))
 
-        // Fill with the project background color.
+        // Multi-exposure composites photos over black (matching Picasa);
+        // the project background color is ignored.
         let colorGen = CIFilter(name: "CIConstantColorGenerator")!
-        colorGen.setValue(CIColor(cgColor: project.backgroundColor.cgColor), forKey: kCIInputColorKey)
+        colorGen.setValue(CIColor(red: 0, green: 0, blue: 0, alpha: 1), forKey: kCIInputColorKey)
         var composite = colorGen.outputImage!.cropped(to: CGRect(x: 0, y: 0, width: outputWidth, height: outputHeight))
 
         let sorted = layers.sorted { $0.zOrder < $1.zOrder }
@@ -287,8 +288,13 @@ enum ExportRenderer {
             let displayW = layer.size.width * scaleX
             let displayH = layer.size.height * scaleY
             let sourceExt = sourceImage.extent
-            let sx = displayW / max(sourceExt.width, 1)
-            let sy = displayH / max(sourceExt.height, 1)
+            // Scale-to-fill: preserve aspect ratio and center-crop the overflow,
+            // matching Picasa (which does not stretch photos to the node rect).
+            let uniformScale = max(displayW / max(sourceExt.width, 1), displayH / max(sourceExt.height, 1))
+            let scaledW = sourceExt.width * uniformScale
+            let scaledH = sourceExt.height * uniformScale
+            let centerOffsetX = (displayW - scaledW) / 2
+            let centerOffsetY = (displayH - scaledH) / 2
             let halfW = displayW / 2
             let halfH = displayH / 2
             let sourceHalfW = sourceExt.width / 2
@@ -298,9 +304,9 @@ enum ExportRenderer {
             t = t.transformed(by: CGAffineTransform(translationX: -sourceHalfW, y: -sourceHalfH))
             t = t.transformed(by: CGAffineTransform(rotationAngle: layer.rotation))
             t = t.transformed(by: CGAffineTransform(translationX: sourceHalfW, y: sourceHalfH))
-            t = t.transformed(by: CGAffineTransform(scaleX: sx, y: sy))
-            let exportX = (layer.position.x - boundingBox.origin.x) * scaleX - halfW
-            let exportY = outputHeight - (layer.position.y - boundingBox.origin.y) * scaleY - halfH
+            t = t.transformed(by: CGAffineTransform(scaleX: uniformScale, y: uniformScale))
+            let exportX = (layer.position.x - boundingBox.origin.x) * scaleX - halfW + centerOffsetX
+            let exportY = outputHeight - (layer.position.y - boundingBox.origin.y) * scaleY - halfH + centerOffsetY
             t = t.transformed(by: CGAffineTransform(translationX: exportX, y: exportY))
 
             // Effective alpha: honor explicit per-node alpha; default to equal 1/N.

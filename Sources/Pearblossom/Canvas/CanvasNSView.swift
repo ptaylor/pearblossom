@@ -114,7 +114,12 @@ final class CanvasNSView: NSView {
         guard let cgContext = NSGraphicsContext.current?.cgContext else { return }
 
         if let proj = project, !proj.layers.isEmpty {
-            if proj.backgroundColor.isTransparent {
+            if proj.isMultiExposure {
+                // Multi-exposure composites photos over black (matching Picasa);
+                // the background color is ignored.
+                cgContext.setFillColor(CGColor(gray: 0, alpha: 1))
+                cgContext.fill(bounds)
+            } else if proj.backgroundColor.isTransparent {
                 drawCheckerboard(in: cgContext, rect: bounds)
             } else if proj.showBoundingBox {
                 // Normal mode: entire canvas uses the background color
@@ -334,15 +339,21 @@ final class CanvasNSView: NSView {
             var t = sourceImage
 
             let workingExtent = sourceImage.extent
-            let sx = layer.size.width / max(workingExtent.width, 1)
-            let sy = layer.size.height / max(workingExtent.height, 1)
-            t = t.transformed(by: CGAffineTransform(scaleX: sx, y: sy))
+            // Scale-to-fill: preserve aspect ratio and center-crop the overflow,
+            // matching Picasa (which does not stretch photos to the node rect).
+            let uniformScale = max(layer.size.width / max(workingExtent.width, 1),
+                                   layer.size.height / max(workingExtent.height, 1))
+            let scaledW = workingExtent.width * uniformScale
+            let scaledH = workingExtent.height * uniformScale
+            let centerOffsetX = (layer.size.width - scaledW) / 2
+            let centerOffsetY = (layer.size.height - scaledH) / 2
+            t = t.transformed(by: CGAffineTransform(scaleX: uniformScale, y: uniformScale))
             t = t.transformed(by: CGAffineTransform(translationX: -halfW, y: -halfH))
             t = t.transformed(by: CGAffineTransform(rotationAngle: layer.rotation))
             t = t.transformed(by: CGAffineTransform(translationX: halfW, y: halfH))
             t = t.transformed(by: CGAffineTransform(
-                translationX: layer.position.x - halfW,
-                y: canvasH - layer.position.y - halfH
+                translationX: layer.position.x - halfW + centerOffsetX,
+                y: canvasH - layer.position.y - halfH + centerOffsetY
             ))
 
             // Effective alpha: honor explicit per-node alpha; default to equal 1/N.
