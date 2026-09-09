@@ -146,7 +146,7 @@ struct InspectorView: View {
 
     // MARK: - Levels Section
 
-    /// A whole-collage tonal adjustment (levels + saturation) with a Pop preset.
+    /// A whole-collage tonal adjustment (levels + saturation) with an Auto preset.
     private func levelsSection(_ binding: Binding<CollageProject>) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Levels")
@@ -155,25 +155,25 @@ struct InspectorView: View {
             toneSlider("Blacks", value: Binding<Double>(
                 get: { binding.wrappedValue.tone.blacks },
                 set: { binding.wrappedValue.tone.blacks = $0; binding.wrappedValue.modifiedAt = Date() }
-            ), range: 0...0.5, step: 0.01) { String(format: "%.0f%%", $0 * 100) }
+            ), range: 0...0.5, step: 0.05) { String(format: "%.0f%%", $0 * 100) }
 
             toneSlider("Mids", value: Binding<Double>(
                 get: { binding.wrappedValue.tone.mids },
                 set: { binding.wrappedValue.tone.mids = $0; binding.wrappedValue.modifiedAt = Date() }
-            ), range: 0.5...2.0, step: 0.05) { String(format: "%.2f", $0) }
+            ), range: 0.5...2.0, step: 0.1) { String(format: "%.2f", $0) }
 
             toneSlider("Whites", value: Binding<Double>(
                 get: { binding.wrappedValue.tone.whites },
                 set: { binding.wrappedValue.tone.whites = $0; binding.wrappedValue.modifiedAt = Date() }
-            ), range: 0.5...1.0, step: 0.01) { String(format: "%.0f%%", $0 * 100) }
+            ), range: 0.5...1.0, step: 0.05) { String(format: "%.0f%%", $0 * 100) }
 
             toneSlider("Saturation", value: Binding<Double>(
                 get: { binding.wrappedValue.tone.saturation },
                 set: { binding.wrappedValue.tone.saturation = $0; binding.wrappedValue.modifiedAt = Date() }
-            ), range: 0...2.0, step: 0.05) { String(format: "%.0f%%", $0 * 100) }
+            ), range: 0...2.0, step: 0.1) { String(format: "%.0f%%", $0 * 100) }
 
             HStack(spacing: 8) {
-                Button("Pop") {
+                Button("Auto") {
                     binding.wrappedValue.tone = .pop
                     binding.wrappedValue.modifiedAt = Date()
                 }
@@ -187,7 +187,7 @@ struct InspectorView: View {
         }
     }
 
-    /// A single slider row with a value label.
+    /// A single slider row laid out as: label | slider | value.
     private func toneSlider(
         _ label: String,
         value: Binding<Double>,
@@ -195,18 +195,17 @@ struct InspectorView: View {
         step: Double,
         display: @escaping (Double) -> String
     ) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        HStack(spacing: 8) {
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .frame(width: 72, alignment: .leading)
             Slider(value: value, in: range, step: step)
-            HStack {
-                Text(label)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                Spacer()
-                Text(display(value.wrappedValue))
-                    .font(.caption)
-                    .monospacedDigit()
-                    .foregroundColor(.secondary)
-            }
+            Text(display(value.wrappedValue))
+                .font(.caption)
+                .monospacedDigit()
+                .foregroundColor(.secondary)
+                .frame(width: 44, alignment: .trailing)
         }
     }
 
