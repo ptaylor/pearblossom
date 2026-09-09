@@ -20,6 +20,31 @@ This project draws inspiration from the photo-collage tradition, including the "
 - Swift Package Manager
 - Zero third-party dependencies
 
+## Building and Running
+
+### Requirements
+
+- macOS 14 (Sonoma) or later
+- Xcode 15+ or the Xcode Command Line Tools (Swift 5.9+)
+
+### From the command line
+
+```bash
+# Build
+swift build
+
+# Run
+swift run Pearblossom
+```
+
+### From Xcode
+
+```bash
+open Package.swift
+```
+
+Then select the **Pearblossom** scheme and press **⌘R** (Run).
+
 ## Architecture
 
 See [`ARCHITECTURE.md`](ARCHITECTURE.md) for the full architecture reference — data models, rendering pipeline, undo system, canvas behavior, file formats, and implementation constraints.

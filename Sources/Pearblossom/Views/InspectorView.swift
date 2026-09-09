@@ -5,6 +5,7 @@ import SwiftUI
 struct InspectorView: View {
 
     @Binding var project: CollageProject?
+    @ObservedObject var state: ProjectState
     @Binding var magnification: CGFloat
     @State private var showExportSheet = false
 
@@ -30,6 +31,8 @@ struct InspectorView: View {
                         shadowSection(binding)
                         Divider()
                         zoomSection()
+                        Divider()
+                        levelsSection(binding)
                         Divider()
                         canvasInfoSection(binding.wrappedValue)
                         Divider()
@@ -139,6 +142,72 @@ struct InspectorView: View {
         if color.isTransparent { return "Transparent" }
         let pct = Int(color.red * 100)
         return "\(pct)% Grey"
+    }
+
+    // MARK: - Levels Section
+
+    /// A whole-collage tonal adjustment (levels + saturation) with a Pop preset.
+    private func levelsSection(_ binding: Binding<CollageProject>) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Levels")
+                .font(.headline)
+
+            toneSlider("Blacks", value: Binding<Double>(
+                get: { binding.wrappedValue.tone.blacks },
+                set: { binding.wrappedValue.tone.blacks = $0; binding.wrappedValue.modifiedAt = Date() }
+            ), range: 0...0.5, step: 0.01) { String(format: "%.0f%%", $0 * 100) }
+
+            toneSlider("Mids", value: Binding<Double>(
+                get: { binding.wrappedValue.tone.mids },
+                set: { binding.wrappedValue.tone.mids = $0; binding.wrappedValue.modifiedAt = Date() }
+            ), range: 0.5...2.0, step: 0.05) { String(format: "%.2f", $0) }
+
+            toneSlider("Whites", value: Binding<Double>(
+                get: { binding.wrappedValue.tone.whites },
+                set: { binding.wrappedValue.tone.whites = $0; binding.wrappedValue.modifiedAt = Date() }
+            ), range: 0.5...1.0, step: 0.01) { String(format: "%.0f%%", $0 * 100) }
+
+            toneSlider("Saturation", value: Binding<Double>(
+                get: { binding.wrappedValue.tone.saturation },
+                set: { binding.wrappedValue.tone.saturation = $0; binding.wrappedValue.modifiedAt = Date() }
+            ), range: 0...2.0, step: 0.05) { String(format: "%.0f%%", $0 * 100) }
+
+            HStack(spacing: 8) {
+                Button("Pop") {
+                    binding.wrappedValue.tone = .pop
+                    binding.wrappedValue.modifiedAt = Date()
+                }
+                Button("Reset") {
+                    binding.wrappedValue.tone = .identity
+                    binding.wrappedValue.modifiedAt = Date()
+                }
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+        }
+    }
+
+    /// A single slider row with a value label.
+    private func toneSlider(
+        _ label: String,
+        value: Binding<Double>,
+        range: ClosedRange<Double>,
+        step: Double,
+        display: @escaping (Double) -> String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Slider(value: value, in: range, step: step)
+            HStack {
+                Text(label)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text(display(value.wrappedValue))
+                    .font(.caption)
+                    .monospacedDigit()
+                    .foregroundColor(.secondary)
+            }
+        }
     }
 
     // MARK: - Bounding Box Section

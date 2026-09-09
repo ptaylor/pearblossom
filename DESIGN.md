@@ -87,6 +87,7 @@ Stored as `<name>.collage.json` in the `Collages/` directory.
 | `manualBoundingBox` | Rect | No | null | User-defined bounding box (manual mode only) |
 | `showBoundingBox` | Bool | No | `true` | Whether the bounding box guide is visible |
 | `isMultiExposure` | Bool | No | `false` | Whether photos blend as a multi-exposure composite (1/N opacity over black). Immutable after creation |
+| `tone` | Tone object | No | identity | Whole-collage levels/saturation adjustment (see Tone Object) |
 | `createdAt` | ISO 8601 date | Yes | now | Creation timestamp |
 | `modifiedAt` | ISO 8601 date | Yes | now | Last modification timestamp |
 
@@ -102,6 +103,26 @@ Stored as `<name>.collage.json` in the `Collages/` directory.
 ```
 
 Values are 0.0–1.0. Presets: 0%, 5%, 10%, 20%, 40%, 60%, 80%, 100% greyscale.
+
+### Tone Object
+
+```json
+{
+  "blacks": 0.0,
+  "mids": 1.0,
+  "whites": 1.0,
+  "saturation": 1.0
+}
+```
+
+A whole-collage tonal adjustment applied to the final composite (both canvas preview and export):
+
+| Field | Type | Description |
+|---|---|---|
+| `blacks` | Number | 0.0–0.5; input level mapped to pure black (default 0) |
+| `mids` | Number | 0.5–2.0; midtone gamma (default 1) |
+| `whites` | Number | 0.5–1.0; input level mapped to pure white (default 1) |
+| `saturation` | Number | 0.0–2.0; color saturation (default 1) |
 
 ### Layer Object
 
@@ -164,6 +185,7 @@ Serialized as `[x, y, width, height]` (origin + size). Used for `manualBoundingB
   "borderMargin": 40,
   "showBoundingBox": true,
   "isMultiExposure": false,
+  "tone": { "blacks": 0, "mids": 1, "whites": 1, "saturation": 1 },
   "createdAt": "2026-07-03T14:00:00Z",
   "modifiedAt": "2026-07-03T14:05:00Z"
 }

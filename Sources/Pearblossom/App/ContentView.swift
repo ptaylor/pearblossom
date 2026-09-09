@@ -30,7 +30,7 @@ struct ContentView: View {
                     handleCanvasDrop(providers: providers)
                     return true
                 }
-            InspectorView(project: $state.project, magnification: $canvasMagnification)
+            InspectorView(project: $state.project, state: state, magnification: $canvasMagnification)
                 .frame(minWidth: 220)
         }
         .onChange(of: state.project?.id) { _, _ in updateWindowTitle() }

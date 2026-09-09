@@ -117,6 +117,7 @@ Sidecar `.collection.json` lives in the collection folder alongside the photos.
 - **v1**: Hard edges only. Each photo is an opaque rectangle (or optionally cropped). Overlap determined solely by z-order.
 - **Opacity**: Supported in v1. Core Image alpha compositing based on `opacity` property.
 - **Multi-exposure**: When `isMultiExposure` is true, layers composite with source-over (Over Operator) blending over a solid black base (the background color is ignored, matching Picasa). Each layer uses its `opacity` when explicitly set (Picasa per-node alpha); otherwise every layer uses α = 1/N. Shadows are skipped.
+- **Tone adjustment**: A whole-collage `tone` (blacks/mids/whites levels + saturation) is applied to the final composite before rendering, in both canvas preview and export. Identity by default.
 - **v2 roadmap**: Soft-edge feathering (`featherRadius`), blend modes (`blendMode`)
 
 ### 5. Rendering Pipeline (Core Image)

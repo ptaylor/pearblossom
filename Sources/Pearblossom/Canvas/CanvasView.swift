@@ -92,11 +92,20 @@ struct CanvasView: NSViewRepresentable {
 
     func updateNSView(_ scrollView: NSScrollView, context: Context) {
         guard let canvas = scrollView.documentView as? CanvasNSView else { return }
+        let previousProjectID = canvas.project?.id
         canvas.project = project
         if let proj = project {
             let newSize = NSSize(width: proj.canvasWidth, height: proj.canvasHeight)
             if canvas.frame.size != newSize {
                 canvas.setFrameSize(newSize)
+            }
+        }
+        // Auto-fit to the bounding box when a different collage is loaded
+        // (import or sidebar open).
+        if let proj = project, proj.id != previousProjectID {
+            let coordinator = context.coordinator
+            DispatchQueue.main.async {
+                coordinator.performFit()
             }
         }
         // Sync magnification from binding → scroll view (for slider changes).
@@ -154,18 +163,32 @@ struct CanvasView: NSViewRepresentable {
         }
 
         @objc private func fitToBoundingBox() {
-            guard let scrollView = scrollView,
-                  var proj = projectBinding.wrappedValue else { return }
+            guard let proj = projectBinding.wrappedValue else { return }
 
             if !proj.showBoundingBox {
-                // Already in fit mode — exit: reset zoom and show bounding box
-                scrollView.animator().magnification = 1.0
-                magnificationBinding.wrappedValue = 1.0
-                proj.showBoundingBox = true
-                projectBinding.wrappedValue = proj
-                Logger.debug("fitToBoundingBox: exit fit mode, reset zoom to 1.0")
+                // Already in fit mode — exit: reset zoom and show bounding box.
+                exitFitMode()
                 return
             }
+            performFit()
+        }
+
+        /// Resets zoom to 1.0 and shows the bounding box guide.
+        private func exitFitMode() {
+            guard let scrollView = scrollView,
+                  var proj = projectBinding.wrappedValue else { return }
+            scrollView.animator().magnification = 1.0
+            magnificationBinding.wrappedValue = 1.0
+            proj.showBoundingBox = true
+            projectBinding.wrappedValue = proj
+            Logger.debug("fitToBoundingBox: exit fit mode, reset zoom to 1.0")
+        }
+
+        /// Zooms the canvas so the collage's bounding box fits the viewport,
+        /// then centers it and hides the bounding box guide (export preview).
+        func performFit() {
+            guard let scrollView = scrollView,
+                  var proj = projectBinding.wrappedValue else { return }
 
             let bb = proj.effectiveBoundingBox()
             let viewSize = scrollView.contentSize
@@ -177,7 +200,7 @@ struct CanvasView: NSViewRepresentable {
             let usableHeight = viewSize.height * (1 - margin * 2)
             let mag = min(usableWidth / bb.width, usableHeight / bb.height)
 
-            // Apply magnification, then read the resulting visible rect to compute scroll
+            // Apply magnification, then read the resulting visible rect to compute scroll.
             scrollView.magnification = mag
             magnificationBinding.wrappedValue = mag
             scrollView.layout()  // let the scroll view settle the new magnification
@@ -187,10 +210,10 @@ struct CanvasView: NSViewRepresentable {
             let scrollY = bb.midY - visibleRect.height / 2
             scrollView.contentView.scroll(to: NSPoint(x: scrollX, y: scrollY))
 
-            // Hide the bounding box guide when zoomed to content — this is the export preview
+            // Hide the bounding box guide when zoomed to content — this is the export preview.
             proj.showBoundingBox = false
             projectBinding.wrappedValue = proj
-            Logger.debug("fitToBoundingBox: bb=\(bb) viewSize=\(viewSize) mag=\(mag) visibleRect=\(visibleRect) scrollTo=(\(scrollX), \(scrollY))")
+            Logger.debug("performFit: bb=\(bb) viewSize=\(viewSize) mag=\(mag) scrollTo=(\(scrollX), \(scrollY))")
         }
 
         func handleDrop(paths: [String], at point: CGPoint, canvas: CanvasNSView,

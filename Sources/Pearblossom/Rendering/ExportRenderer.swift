@@ -48,12 +48,13 @@ enum ExportRenderer {
             return nil
         }
 
-        let cgImage = context.createCGImage(final, from: final.extent)
+        let adjusted = project.tone.applying(to: final)
+        let cgImage = context.createCGImage(adjusted, from: adjusted.extent)
         if cgImage == nil {
-            Logger.error("ExportRenderer: context.createCGImage returned nil for extent=\(final.extent)")
+            Logger.error("ExportRenderer: context.createCGImage returned nil for extent=\(adjusted.extent)")
         } else {
-            let pxW = Int(final.extent.width)
-            let pxH = Int(final.extent.height)
+            let pxW = Int(adjusted.extent.width)
+            let pxH = Int(adjusted.extent.height)
             Logger.debug("ExportRenderer: rendered \(pxW)×\(pxH) px (scaleMultiplier=\(scaleMultiplier), baseRatio=\(String(format: "%.2f", baseRatio)))")
         }
         return cgImage

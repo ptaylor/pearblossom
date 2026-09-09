@@ -295,11 +295,19 @@ final class CanvasNSView: NSView {
             }
         }
 
-        // Generate and cache the CGImage, then draw at the correct canvas position
-        if let final = composite, let cgImage = ciContext.createCGImage(final, from: final.extent) {
+        // Apply the tone adjustment, cache the CGImage, and draw at the canvas position.
+        if let final = composite {
+            drawFinalComposite(final, canvasH: canvasH, in: cgContext)
+        }
+    }
+
+    /// Applies the collage's tone adjustment, then caches and draws the final composite.
+    private func drawFinalComposite(_ final: CIImage, canvasH: CGFloat, in cgContext: CGContext) {
+        let adjusted = project?.tone.applying(to: final) ?? final
+        if let cgImage = ciContext.createCGImage(adjusted, from: adjusted.extent) {
             cachedComposite = cgImage
-            cachedCompositeExtent = final.extent
-            drawCGImageFlipped(cgImage, extent: final.extent, canvasH: canvasH, in: cgContext)
+            cachedCompositeExtent = adjusted.extent
+            drawCGImageFlipped(cgImage, extent: adjusted.extent, canvasH: canvasH, in: cgContext)
         }
     }
 
@@ -374,10 +382,8 @@ final class CanvasNSView: NSView {
             }
         }
 
-        if let final = composite, let cgImage = ciContext.createCGImage(final, from: final.extent) {
-            cachedComposite = cgImage
-            cachedCompositeExtent = final.extent
-            drawCGImageFlipped(cgImage, extent: final.extent, canvasH: canvasH, in: cgContext)
+        if let final = composite {
+            drawFinalComposite(final, canvasH: canvasH, in: cgContext)
         }
     }
 

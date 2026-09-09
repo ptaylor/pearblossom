@@ -1,5 +1,6 @@
 import Foundation
 import CoreGraphics
+import CoreImage
 import Combine
 
 /// A collage project — persisted as a .collage.json file.
@@ -18,13 +19,14 @@ final class CollageProject: ObservableObject, Codable, Identifiable {
     @Published var manualBoundingBox: CGRect? = nil
     @Published var showBoundingBox: Bool = true
     @Published var isMultiExposure: Bool = false
+    @Published var tone: ToneAdjustment = .identity
     let createdAt: Date
     @Published var modifiedAt: Date
 
     enum CodingKeys: String, CodingKey {
         case id, version, name, description, filePath, canvasWidth, canvasHeight
         case backgroundColor, layers, boundingBoxMode, borderMargin, manualBoundingBox
-        case showBoundingBox, isMultiExposure, createdAt, modifiedAt
+        case showBoundingBox, isMultiExposure, tone, createdAt, modifiedAt
     }
 
     /// Computes the effective bounding box based on mode and layer positions.
@@ -145,6 +147,7 @@ final class CollageProject: ObservableObject, Codable, Identifiable {
          manualBoundingBox: CGRect? = nil,
          showBoundingBox: Bool = true,
          isMultiExposure: Bool = false,
+         tone: ToneAdjustment = .identity,
          createdAt: Date = Date(),
          modifiedAt: Date = Date()) {
         self.id = id
@@ -161,6 +164,7 @@ final class CollageProject: ObservableObject, Codable, Identifiable {
         self.manualBoundingBox = manualBoundingBox
         self.showBoundingBox = showBoundingBox
         self.isMultiExposure = isMultiExposure
+        self.tone = tone
         self.createdAt = createdAt
         self.modifiedAt = modifiedAt
     }
@@ -183,6 +187,7 @@ final class CollageProject: ObservableObject, Codable, Identifiable {
         manualBoundingBox = try container.decodeIfPresent(CGRect.self, forKey: .manualBoundingBox)
         showBoundingBox = try container.decodeIfPresent(Bool.self, forKey: .showBoundingBox) ?? true
         isMultiExposure = try container.decodeIfPresent(Bool.self, forKey: .isMultiExposure) ?? false
+        tone = try container.decodeIfPresent(ToneAdjustment.self, forKey: .tone) ?? .identity
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
         modifiedAt = try container.decodeIfPresent(Date.self, forKey: .modifiedAt) ?? Date()
     }
@@ -203,8 +208,69 @@ final class CollageProject: ObservableObject, Codable, Identifiable {
         try container.encode(manualBoundingBox, forKey: .manualBoundingBox)
         try container.encode(showBoundingBox, forKey: .showBoundingBox)
         try container.encode(isMultiExposure, forKey: .isMultiExposure)
+        try container.encode(tone, forKey: .tone)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(modifiedAt, forKey: .modifiedAt)
+    }
+}
+
+/// A simple whole-collage tonal adjustment (levels + saturation).
+/// Kept intentionally basic: blacks/mids/whites mirror a 3-point levels control;
+/// `saturation` provides extra "pop". All values use identity defaults.
+struct ToneAdjustment: Codable, Equatable {
+    var blacks: Double = 0       // 0...0.5  — input level mapped to pure black
+    var mids: Double = 1         // 0.5...2.0 — midtone gamma (1 = neutral)
+    var whites: Double = 1       // 0.5...1.0 — input level mapped to pure white
+    var saturation: Double = 1   // 0...2.0
+
+    static let identity = ToneAdjustment()
+
+    var isIdentity: Bool {
+        blacks == 0 && mids == 1 && whites == 1 && saturation == 1
+    }
+
+    /// A pleasant one-click preset approximating Picasa's autolight/finetune.
+    static let pop = ToneAdjustment(blacks: 0.05, mids: 1.15, whites: 0.95, saturation: 1.2)
+
+    /// Applies the adjustment to a final composite via Core Image.
+    /// Returns the image unchanged when the adjustment is identity.
+    func applying(to image: CIImage) -> CIImage {
+        guard !isIdentity else { return image }
+        var result = image
+
+        // Levels: linear stretch (blacks → 0, whites → 1), then midtone gamma.
+        if blacks != 0 || whites != 1 || mids != 1 {
+            let black = CGFloat(min(max(blacks, 0), 0.5))
+            let white = CGFloat(max(min(whites, 1), 0.5))
+            let range = max(white - black, 0.001)
+            let scale = 1.0 / range
+            let bias = -black * scale
+
+            let matrix = CIFilter(name: "CIColorMatrix")!
+            matrix.setValue(result, forKey: kCIInputImageKey)
+            matrix.setValue(CIVector(x: scale, y: 0, z: 0, w: 0), forKey: "inputRVector")
+            matrix.setValue(CIVector(x: 0, y: scale, z: 0, w: 0), forKey: "inputGVector")
+            matrix.setValue(CIVector(x: 0, y: 0, z: scale, w: 0), forKey: "inputBVector")
+            matrix.setValue(CIVector(x: bias, y: bias, z: bias, w: 0), forKey: "inputBiasVector")
+            result = matrix.outputImage ?? result
+
+            if mids != 1 {
+                let gamma = CIFilter(name: "CIGammaAdjust")!
+                gamma.setValue(result, forKey: kCIInputImageKey)
+                gamma.setValue(CGFloat(1.0 / max(mids, 0.01)), forKey: "inputPower")
+                result = gamma.outputImage ?? result
+            }
+        }
+
+        // Saturation
+        if saturation != 1 {
+            let controls = CIFilter(name: "CIColorControls")!
+            controls.setValue(result, forKey: kCIInputImageKey)
+            controls.setValue(CGFloat(saturation), forKey: kCIInputSaturationKey)
+            result = controls.outputImage ?? result
+        }
+
+        return result
     }
 }
 
