@@ -109,7 +109,7 @@ struct RenameCollageDialog: View {
         // If only description changed, update file in place
         if !nameChanged {
             // Update the .collage.json with new description
-            var updated = collage
+            let updated = collage
             updated.description = trimmedDesc
             updated.modifiedAt = Date()
             if let path = updated.filePath {
@@ -141,7 +141,7 @@ struct RenameCollageDialog: View {
 
         do {
             // Build updated collage with new name and path
-            var updated = collage
+            let updated = collage
             updated.name = trimmed
             updated.description = trimmedDesc
             updated.filePath = newFileURL.path

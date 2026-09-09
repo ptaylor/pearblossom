@@ -827,7 +827,7 @@ final class CanvasNSView: NSView {
         switch interactionMode {
         case .rotating:
             guard let id = selectedLayerIDs.first,
-                  var proj = project,
+                  let proj = project,
                   let index = proj.layers.firstIndex(where: { $0.id == id }) else { return }
             let center = proj.layers[index].position
             let newAngle = atan2(point.y - center.y, point.x - center.x)
@@ -837,7 +837,7 @@ final class CanvasNSView: NSView {
 
         case .resizing(let corner):
             guard let id = selectedLayerIDs.first,
-                  var proj = project,
+                  let proj = project,
                   let index = proj.layers.firstIndex(where: { $0.id == id }) else { return }
             let anchor = resizeOppositeCorner
             let shiftHeld = event.modifierFlags.contains(.shift)
@@ -928,7 +928,7 @@ final class CanvasNSView: NSView {
             needsDisplay = true
 
         case .resizingBoundingBox(let corner):
-            guard var proj = project else { return }
+            guard let proj = project else { return }
             let anchor = bbResizeOppositeCorner
             var newBB = bbResizeStartRect
 
@@ -1007,7 +1007,7 @@ final class CanvasNSView: NSView {
 
     override func keyDown(with event: NSEvent) {
         guard !selectedLayerIDs.isEmpty, let id = selectedLayerIDs.first,
-              var proj = project else {
+              let proj = project else {
             super.keyDown(with: event)
             return
         }
@@ -1132,7 +1132,7 @@ final class CanvasNSView: NSView {
     }
 
     @objc private func handleContextMenu(_ sender: NSMenuItem) {
-        guard let id = sender.representedObject as? UUID, var proj = project else { return }
+        guard let id = sender.representedObject as? UUID, let proj = project else { return }
         switch sender.tag {
         case 1: proj.bringToFront(layerID: id)
         case 2: proj.sendToBack(layerID: id)

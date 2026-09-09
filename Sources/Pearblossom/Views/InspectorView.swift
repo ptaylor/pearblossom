@@ -1,13 +1,21 @@
 import SwiftUI
+import Combine
 
 /// Inspector panel shown on the right side of the main window.
 /// Displays canvas configuration when a project is selected.
 struct InspectorView: View {
 
     @Binding var project: CollageProject?
-    @ObservedObject var state: ProjectState
     @Binding var magnification: CGFloat
     @State private var showExportSheet = false
+    @State private var projectRevision = 0
+
+    /// Emits whenever the current project changes, so the inspector re-renders
+    /// and its controls track edits made elsewhere (e.g. the canvas or presets).
+    private var projectChanges: AnyPublisher<Void, Never> {
+        project?.objectWillChange.eraseToAnyPublisher()
+            ?? Empty<Void, Never>().eraseToAnyPublisher()
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -51,6 +59,9 @@ struct InspectorView: View {
             }
         }
         .frame(minWidth: 260)
+        .onReceive(projectChanges) { _ in
+            projectRevision += 1
+        }
         .sheet(isPresented: $showExportSheet) {
             if let proj = project {
                 ExportSettingsView(project: proj)

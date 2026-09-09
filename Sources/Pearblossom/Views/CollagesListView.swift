@@ -277,7 +277,7 @@ struct CollagesListView: View {
             }
 
             guard let data = try? Data(contentsOf: fileURL),
-                  var project = try? JSONDecoder().decode(CollageProject.self, from: data) else {
+                  let project = try? JSONDecoder().decode(CollageProject.self, from: data) else {
                 return nil
             }
 

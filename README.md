@@ -30,12 +30,21 @@ This project draws inspiration from the photo-collage tradition, including the "
 ### From the command line
 
 ```bash
-# Build
+# Build (debug)
 swift build
 
-# Run
+# Build (release)
+swift build -c release
+
+# Run (debug build)
 swift run Pearblossom
+
+# Run (release build)
+swift run -c release Pearblossom
 ```
+
+Built binaries are placed in `.build/debug/Pearblossom` (debug) and
+`.build/release/Pearblossom` (release).
 
 ### From Xcode
 

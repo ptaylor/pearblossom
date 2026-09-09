@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import Combine
 
 // MARK: - Zoomable Scroll View
 
@@ -66,7 +67,7 @@ struct CanvasView: NSViewRepresentable {
         canvas.onLayersChanged = { [weak canvas] in
             guard let canvas = canvas, let proj = canvas.project else { return }
             proj.modifiedAt = Date()  // triggers @Published → SwiftUI observes change
-            context.coordinator.scheduleAutoSave(canvas: canvas)
+            context.coordinator.scheduleAutoSave()
         }
 
         let scrollView = ZoomableScrollView(frame: .zero)
@@ -100,12 +101,15 @@ struct CanvasView: NSViewRepresentable {
                 canvas.setFrameSize(newSize)
             }
         }
-        // Auto-fit to the bounding box when a different collage is loaded
-        // (import or sidebar open).
-        if let proj = project, proj.id != previousProjectID {
-            let coordinator = context.coordinator
-            DispatchQueue.main.async {
-                coordinator.performFit()
+        // When a different collage is loaded (import or sidebar open),
+        // re-subscribe for auto-save and auto-fit to the bounding box.
+        if project?.id != previousProjectID {
+            context.coordinator.observeProject(project)
+            if project != nil {
+                let coordinator = context.coordinator
+                DispatchQueue.main.async {
+                    coordinator.performFit()
+                }
             }
         }
         // Sync magnification from binding → scroll view (for slider changes).
@@ -135,6 +139,7 @@ struct CanvasView: NSViewRepresentable {
         weak var scrollView: NSScrollView?
         weak var canvasView: CanvasNSView?
         private var autoSaveWorkItem: DispatchWorkItem?
+        private var projectObserver: AnyCancellable?
         var deferredDropObserver: NSObjectProtocol?
 
         init(project: Binding<CollageProject?>, magnification: Binding<CGFloat>) {
@@ -176,11 +181,10 @@ struct CanvasView: NSViewRepresentable {
         /// Resets zoom to 1.0 and shows the bounding box guide.
         private func exitFitMode() {
             guard let scrollView = scrollView,
-                  var proj = projectBinding.wrappedValue else { return }
+                  let proj = projectBinding.wrappedValue else { return }
             scrollView.animator().magnification = 1.0
             magnificationBinding.wrappedValue = 1.0
             proj.showBoundingBox = true
-            projectBinding.wrappedValue = proj
             Logger.debug("fitToBoundingBox: exit fit mode, reset zoom to 1.0")
         }
 
@@ -188,7 +192,7 @@ struct CanvasView: NSViewRepresentable {
         /// then centers it and hides the bounding box guide (export preview).
         func performFit() {
             guard let scrollView = scrollView,
-                  var proj = projectBinding.wrappedValue else { return }
+                  let proj = projectBinding.wrappedValue else { return }
 
             let bb = proj.effectiveBoundingBox()
             let viewSize = scrollView.contentSize
@@ -212,13 +216,12 @@ struct CanvasView: NSViewRepresentable {
 
             // Hide the bounding box guide when zoomed to content — this is the export preview.
             proj.showBoundingBox = false
-            projectBinding.wrappedValue = proj
             Logger.debug("performFit: bb=\(bb) viewSize=\(viewSize) mag=\(mag) scrollTo=(\(scrollX), \(scrollY))")
         }
 
         func handleDrop(paths: [String], at point: CGPoint, canvas: CanvasNSView,
                         collectionID: UUID? = nil, photoIDs: [UUID] = []) {
-            guard var proj = projectBinding.wrappedValue else {
+            guard let proj = projectBinding.wrappedValue else {
                 let settings = AppSettings.shared
                 NotificationCenter.default.post(name: .blankCanvasDrop, object: nil, userInfo: [
                     "paths": paths,
@@ -241,7 +244,7 @@ struct CanvasView: NSViewRepresentable {
 
             Logger.debug("handleDrop: \(paths.count) file(s), dropPoint=\(point), canvasSize=\(canvasSize), targetDim=\(targetDim) (scalePercent=\(scalePercent)), maxZ=\(maxZ)")
 
-            for (index, path) in paths.enumerated() {
+            for (_, path) in paths.enumerated() {
                 let nsImage = NSImage(contentsOfFile: path)
                 let nsImageSize = nsImage?.size ?? .zero
 
@@ -290,7 +293,7 @@ struct CanvasView: NSViewRepresentable {
             projectBinding.wrappedValue = proj
             canvas.project = proj
             canvas.needsDisplay = true
-            scheduleAutoSave(canvas: canvas)
+            scheduleAutoSave()
             Logger.debug("Dropped \(paths.count) photo(s) onto canvas '\(proj.name)' — total layers now: \(proj.layers.count)")
         }
 
@@ -303,7 +306,15 @@ struct CanvasView: NSViewRepresentable {
             return absolute
         }
 
-        func scheduleAutoSave(canvas: CanvasNSView) {
+        /// Subscribes to the current project's changes so any edit (canvas or
+        /// inspector) schedules a debounced auto-save.
+        func observeProject(_ project: CollageProject?) {
+            projectObserver = project?.objectWillChange.sink { [weak self] _ in
+                self?.scheduleAutoSave()
+            }
+        }
+
+        func scheduleAutoSave() {
             autoSaveWorkItem?.cancel()
             let workItem = DispatchWorkItem { [weak self] in
                 guard let self, let proj = self.projectBinding.wrappedValue,

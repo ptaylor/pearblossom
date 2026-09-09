@@ -6,12 +6,12 @@ struct SidebarView: View {
 
     /// Which tab is active in the sidebar.
     enum SidebarTab: String, CaseIterable {
-        case collections = "Collections"
         case collages = "Collages"
+        case collections = "Collections"
     }
 
     @Binding var selectedProject: CollageProject?
-    @State private var selectedTab: SidebarTab = .collections
+    @State private var selectedTab: SidebarTab = .collages
     @State private var showCXFPicker = false
     @State private var cxfImportRequest: CXFImportRequest? = nil
 
