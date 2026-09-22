@@ -219,7 +219,7 @@ protocol Command: Codable {
 - Import creates a `CollageProject` and a matching `PhotoCollection` (same name) atomically. The name is suggested from the file stem and validated against both `Collages/` and `Collections/` for clashes; the dialog blocks on any clash.
 - `multiexp` → `isMultiExposure = true`, per-node `alpha` stored as layer `opacity`. `picturepile` → normal collage, with `shadowRadius` applied to shadowed/whiteframe nodes (white borders are not reproduced).
 - Node geometry: Picasa stores `(x, y)` as the photo's top-left corner with a `theta` rotation around it. The importer negates `theta` (Pearblossom positive rotation = clockwise) and converts the top-left anchor to Pearblossom's center-based `position`.
-- Source photos are linked in place by default (`.reference`) or copied into the collection (`.copy`) via an import-dialog option. Missing files are skipped and reported. Canvas size is derived from the `format` ratio (2000 pt long side); background from the AARRGGBB `<background color>`.
+- Source photos are linked in place by default (`.reference`) or copied into the collection (`.copy`) via an import-dialog option. Missing files are skipped and reported. Canvas size is derived from the `format` ratio with `orientation` deciding which axis carries the 2000 pt long edge (`format="297:210"` + `orientation="portrait"` → 1414 × 2000); background from the AARRGGBB `<background color>`.
 
 ### 8. Window Layout
 

@@ -24,7 +24,9 @@ enum CollageImporter {
         let data = try Data(contentsOf: cxfURL)
         let collage = try CXFParser.parse(data)
 
-        let (canvasW, canvasH) = canvasDimensions(format: collage.format, orientation: collage.orientation)
+        let canvasSize = CXFCanvasGeometry.dimensions(format: collage.format, orientation: collage.orientation)
+        let canvasW = canvasSize.width
+        let canvasH = canvasSize.height
         let background = parseBackground(collage.background)
 
         // Translate node paths and dedupe into one CollectionPhoto per unique source.
@@ -81,17 +83,42 @@ enum CollageImporter {
             }
 
             let size = CGSize(width: node.w * Double(canvasW), height: node.h * Double(canvasH))
-            // Picasa stores (x, y) as the photo's top-left corner. Reproduce its
-            // layout: the rotation is negated (Pearblossom positive = clockwise)
-            // and the stored center is offset by the rotated half-extents.
             let halfW = size.width / 2
             let halfH = size.height / 2
             let cosTheta = cos(node.theta)
             let sinTheta = sin(node.theta)
-            let centerX = node.x * Double(canvasW) + Double(halfW) * cosTheta - Double(halfH) * sinTheta
-            let centerY = node.y * Double(canvasH) + Double(halfH) * sinTheta + Double(halfH) * cosTheta
+
+            // Picasa positions the box's centre at the anchor plus the half-extents rotated by
+            // `theta` — but it uses the half-WIDTH for both axes (the same class of half-extent
+            // mix-up this importer used to have, with halfW instead of halfH):
+            //     centre = (x·W + halfW·cosθ − halfW·sinθ, y·H + halfW·sinθ + halfW·cosθ)
+            // At θ = 0 that reduces to centre = (x·W + halfW, y·H + halfW), i.e. the box sits
+            // (halfW − halfH) lower than the stored y implies — which is why a Picasa panorama's
+            // horizon lines up and ours didn't, and why the effect varies per photo.
+            //
+            // Derived empirically by compositing the real source photos with the CXF geometry
+            // and comparing against Picasa's own exports (mean pixel error, lower is better).
+            // Files below are a 25:20 landscape, a 297:210 landscape and a 297:210 portrait:
+            //     no correction                     29.8 / 25.6 / 10.6
+            //     best uniform y shift               5.8 / 13.8 /  4.6
+            //     θ=0 offset (halfW−halfH only)      1.3 / 10.6 /  1.9
+            //     this rule                          1.3 /  8.3 /  0.9
+            // On the shadow-free file it beats a free per-photo (dx, dy) fit (1.3 vs 2.3), which
+            // is what identifies it as the rule rather than a fit. Applying the same offset to x
+            // as well, or offsetting x alone, both make every file substantially worse — there
+            // is no horizontal counterpart.
+            //
+            // Not yet verified for portrait-aspect photos (where halfW < halfH, so the offset
+            // inverts) and left out of `multiexp` for now, since all evidence is picturepile.
+            let useHalfExtentOffset = collage.theme == "picturepile"
+            // Second half-extent of the rotated offset: halfW for picturepile (see above),
+            // halfH for multiexp, which keeps the symmetric behaviour until verified.
+            let offsetHalfH = useHalfExtentOffset ? Double(halfW) : Double(halfH)
+            let centerX = node.x * Double(canvasW) + Double(halfW) * cosTheta - offsetHalfH * sinTheta
+            let centerY = node.y * Double(canvasH) + Double(halfW) * sinTheta + offsetHalfH * cosTheta
             let position = CGPoint(x: centerX, y: centerY)
             let sourceResolution = imageDimensions(at: resolved) ?? .zero
+            warnOnAspectMismatch(node: node, size: size, sourceResolution: sourceResolution)
 
             let layer = PhotoLayer(
                 photoPath: resolved,
@@ -99,10 +126,8 @@ enum CollageImporter {
                 photoID: photo.id,
                 position: position,
                 size: size,
-                // Picasa stores (x, y) as the photo's top-left corner and rotates
-                // around it. Pearblossom renders positive rotation clockwise, so
-                // the angle is negated and the center offset accordingly.
-                rotation: -node.theta,
+                // Picasa's positive theta is clockwise, matching Pearblossom's renderer.
+                rotation: node.theta,
                 zOrder: zOrder,
                 opacity: node.alpha ?? 1.0,
                 sourceResolution: sourceResolution,
@@ -132,20 +157,27 @@ enum CollageImporter {
 
     // MARK: - Helpers
 
-    /// Derives a point-based canvas size from the `format` ratio. The long side is 2000 pt.
-    private static func canvasDimensions(format: String?, orientation: String?) -> (CGFloat, CGFloat) {
-        let parts = (format ?? "4:3").split(separator: ":").compactMap { Double($0) }
-        guard parts.count == 2, parts[0] > 0, parts[1] > 0 else {
-            return (2000, 1500)
-        }
-        let width = parts[0]
-        let height = parts[1]
-        let longSide: CGFloat = 2000
-        if width >= height {
-            return (longSide, (longSide * CGFloat(height / width)).rounded())
-        } else {
-            return ((longSide * CGFloat(width / height)).rounded(), longSide)
-        }
+    /// Logs when a node's box aspect diverges from the photo's real aspect ratio.
+    ///
+    /// Layers are drawn by scaling the source image non-uniformly to fill `size`
+    /// (`CanvasNSView.renderLayers`), so any mismatch renders as a visible stretch.
+    /// Picasa normally stores boxes matching the photo, so a large delta indicates a stale
+    /// or manually-adjusted node — surface it rather than silently distorting the photo.
+    private static func warnOnAspectMismatch(node: CXFNode, size: CGSize, sourceResolution: CGSize) {
+        guard sourceResolution.width > 0, sourceResolution.height > 0,
+              size.width > 0, size.height > 0 else { return }
+
+        let boxAspect = size.width / size.height
+        let photoAspect = sourceResolution.width / sourceResolution.height
+        let delta = abs(boxAspect / photoAspect - 1)
+        guard delta > 0.02 else { return }
+
+        Logger.warn("""
+            Picasa import: node '\(node.src ?? "<no src>")' box \(Int(size.width))×\(Int(size.height)) \
+            (aspect \(String(format: "%.3f", boxAspect)), theme \(node.theme ?? "default")) does not match \
+            photo aspect \(String(format: "%.3f", photoAspect)) — off by \(String(format: "%.1f", delta * 100))%; \
+            the photo will be stretched to fill the box
+            """)
     }
 
     /// Parses an AARRGGBB background into a `CodableColor`. Defaults to white.
