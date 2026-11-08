@@ -482,7 +482,7 @@ struct CollectionsListView: View {
 
         let path = photo.resolvedPath(relativeTo: collection.folderPath)
         DispatchQueue.global(qos: .userInitiated).async {
-            let dims = Self.imageDimensions(at: path)
+            let dims = ImageDimensions.orientedPixelSize(at: path)
             DispatchQueue.main.async {
                 // Only update if this photo is still the single selected one
                 if selectedPhotoIDs.count == 1, selectedPhotoIDs.first == selectedID {
@@ -490,19 +490,6 @@ struct CollectionsListView: View {
                 }
             }
         }
-    }
-
-    /// Reads image pixel dimensions using CGImageSource (fast, doesn't fully decode).
-    private static func imageDimensions(at path: String) -> CGSize? {
-        guard let src = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil) else {
-            return nil
-        }
-        guard let props = CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any],
-              let width = props[kCGImagePropertyPixelWidth] as? CGFloat,
-              let height = props[kCGImagePropertyPixelHeight] as? CGFloat else {
-            return nil
-        }
-        return CGSize(width: width, height: height)
     }
 
     // MARK: - Collection Picker Popover

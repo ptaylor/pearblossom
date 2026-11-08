@@ -117,7 +117,8 @@ enum CollageImporter {
             let centerX = node.x * Double(canvasW) + Double(halfW) * cosTheta - offsetHalfH * sinTheta
             let centerY = node.y * Double(canvasH) + Double(halfW) * sinTheta + offsetHalfH * cosTheta
             let position = CGPoint(x: centerX, y: centerY)
-            let sourceResolution = imageDimensions(at: resolved) ?? .zero
+            // Picasa's w/h are in displayed (EXIF-oriented) terms, as is the renderer.
+            let sourceResolution = ImageDimensions.orientedPixelSize(at: resolved) ?? .zero
             warnOnAspectMismatch(node: node, size: size, sourceResolution: sourceResolution)
 
             let layer = PhotoLayer(
@@ -218,17 +219,6 @@ enum CollageImporter {
             return 8
         }
         return 0
-    }
-
-    /// Reads pixel dimensions without fully decoding the image.
-    private static func imageDimensions(at path: String) -> CGSize? {
-        guard let source = CGImageSourceCreateWithURL(URL(fileURLWithPath: path) as CFURL, nil),
-              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
-              let width = properties[kCGImagePropertyPixelWidth] as? CGFloat,
-              let height = properties[kCGImagePropertyPixelHeight] as? CGFloat else {
-            return nil
-        }
-        return CGSize(width: width, height: height)
     }
 }
 
