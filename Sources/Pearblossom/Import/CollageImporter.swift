@@ -126,8 +126,13 @@ enum CollageImporter {
                 photoID: photo.id,
                 position: position,
                 size: size,
-                // Picasa's positive theta is clockwise, matching Pearblossom's renderer.
-                rotation: node.theta,
+                // Picasa's positive theta is clockwise on screen, but Pearblossom's renderer
+                // (CGAffineTransform(rotationAngle:) on the CIImage) turns positive angles
+                // counter-clockwise, so the sign must be negated. Verified on sam-train-2:
+                // scan_104 at theta 4.712 (Picasa: cab left, smoke top) rendered 180° off
+                // when stored as +theta. The centre offsets above are canvas-space and are
+                // unaffected because the layer rotates about its own centre.
+                rotation: -node.theta,
                 zOrder: zOrder,
                 opacity: node.alpha ?? 1.0,
                 sourceResolution: sourceResolution,
