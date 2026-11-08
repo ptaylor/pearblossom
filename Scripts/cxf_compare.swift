@@ -15,11 +15,18 @@ import UniformTypeIdentifiers
 
 // MARK: - Placement rules
 
-/// A candidate mapping from a CXF node to its layer centre in canvas points.
+/// A candidate mapping from a CXF node to the layer Pearblossom draws.
+///
+/// `production` is the importer's own `CXFCanvasGeometry.layerPlacement`: it is handed the
+/// photo as stored plus its Picasa.ini quarter turns, exactly like the importer. The other
+/// rules are placement hypotheses about Picasa, so they are handed the photo already turned
+/// the way Picasa shows it and only decide where its centre goes.
 struct PlacementRule {
+    typealias Placement = CXFCanvasGeometry.LayerPlacement
     let name: String
     let summary: String
-    let center: (CXFNode, CGSize, String) -> CGPoint
+    let handlesPicasaRotation: Bool
+    let place: (_ node: CXFNode, _ canvas: CGSize, _ theme: String, _ quarterTurns: Int) -> Placement
 }
 
 /// Anchor `(x·W, y·H)` plus the offset `(a, b)` rotated clockwise (screen space) by theta.
@@ -29,22 +36,26 @@ private func anchoredCenter(_ node: CXFNode, _ canvas: CGSize, a: Double, b: Dou
                    y: node.y * Double(canvas.height) + a * s + b * c)
 }
 
+/// A hypothesis rule: the node's own box and theta, with `offset` choosing (a, b).
+private func hypothesis(_ name: String, _ summary: String, offset: @escaping (CGSize) -> (Double, Double)) -> PlacementRule {
+    PlacementRule(name: name, summary: summary, handlesPicasaRotation: false) { node, canvas, _, _ in
+        let box = CXFCanvasGeometry.boxSize(for: node, canvasSize: canvas)
+        let (a, b) = offset(box)
+        return .init(center: anchoredCenter(node, canvas, a: a, b: b), size: box, clockwiseRotation: node.theta)
+    }
+}
+
 let allRules: [PlacementRule] = [
-    PlacementRule(name: "production", summary: "CXFCanvasGeometry.layerCenter (what the importer does)") {
-        CXFCanvasGeometry.layerCenter(for: $0, canvasSize: $1, theme: $2)
+    PlacementRule(name: "production", summary: "CXFCanvasGeometry.layerPlacement (what the importer does)",
+                  handlesPicasaRotation: true) {
+        CXFCanvasGeometry.layerPlacement(for: $0, canvasSize: $1, theme: $2, quarterTurns: $3)
     },
-    PlacementRule(name: "halfW", summary: "anchor + R(θ)·(w/2, w/2)") { node, canvas, _ in
-        let box = CXFCanvasGeometry.boxSize(for: node, canvasSize: canvas)
-        return anchoredCenter(node, canvas, a: Double(box.width) / 2, b: Double(box.width) / 2)
+    hypothesis("halfW", "anchor + R(θ)·(w/2, w/2)") { (Double($0.width) / 2, Double($0.width) / 2) },
+    hypothesis("longEdge", "anchor + R(θ)·(L/2, L/2), L = max(w, h)") {
+        (Double(max($0.width, $0.height)) / 2, Double(max($0.width, $0.height)) / 2)
     },
-    PlacementRule(name: "longEdge", summary: "anchor + R(θ)·(L/2, L/2), L = max(w, h)") { node, canvas, _ in
-        let box = CXFCanvasGeometry.boxSize(for: node, canvasSize: canvas)
-        let half = Double(max(box.width, box.height)) / 2
-        return anchoredCenter(node, canvas, a: half, b: half)
-    },
-    PlacementRule(name: "boxCentre", summary: "anchor + R(θ)·(w/2, h/2), plain rotation about the top-left") { node, canvas, _ in
-        let box = CXFCanvasGeometry.boxSize(for: node, canvasSize: canvas)
-        return anchoredCenter(node, canvas, a: Double(box.width) / 2, b: Double(box.height) / 2)
+    hypothesis("boxCentre", "anchor + R(θ)·(w/2, h/2), plain rotation about the top-left") {
+        (Double($0.width) / 2, Double($0.height) / 2)
     },
 ]
 
@@ -84,75 +95,32 @@ func loadImage(_ path: String, maxPixel: Int) -> (image: CGImage, orientation: I
     return (image, orientation)
 }
 
-// MARK: - Picasa.ini edits (diagnostic; the importer does not read these yet)
+// MARK: - Picasa.ini edits
 
-/// Set by `--picasa-ini`: draw sources with Picasa's rotate/crop edits applied.
-var applyPicasaINI = false
+/// Set by `--picasa-crop`: draw sources with their Picasa.ini crop, which the importer does
+/// not apply yet. Rotation is always applied, because the importer applies it.
+var applyPicasaCrop = false
 
-/// Picasa's non-destructive edits for one photo, from the `Picasa.ini` beside it.
-struct PicasaEdits {
-    var quarterTurns = 0      // `rotate=rotate(n)`: n quarter turns clockwise
-    var crop: CGRect?         // `crop=rect64(…)`: fractions of the displayed image, top-left origin
+/// Picasa's crop, in displayed (EXIF-oriented) terms with a top-left origin.
+func cropped(_ image: CGImage, to crop: CGRect?) -> CGImage {
+    guard let crop else { return image }
+    let rect = CGRect(x: crop.minX * CGFloat(image.width), y: crop.minY * CGFloat(image.height),
+                      width: crop.width * CGFloat(image.width), height: crop.height * CGFloat(image.height)).integral
+    return image.cropping(to: rect) ?? image  // CGImage cropping uses a top-left origin
 }
 
-private var iniCache = [String: [String: PicasaEdits]]()
-
-/// Reads `Picasa.ini` (or `.picasa.ini`) in the photo's folder and returns its edits.
-func picasaEdits(for path: String) -> PicasaEdits {
-    let url = URL(fileURLWithPath: path)
-    let folder = url.deletingLastPathComponent().path
-    if iniCache[folder] == nil {
-        var sections = [String: PicasaEdits]()
-        let text = ["Picasa.ini", ".picasa.ini"].lazy
-            .compactMap { try? String(contentsOfFile: folder + "/" + $0, encoding: .utf8) }.first ?? ""
-        var current: String?
-        for rawLine in text.components(separatedBy: .newlines) {
-            let line = rawLine.trimmingCharacters(in: .whitespaces)
-            if line.hasPrefix("["), line.hasSuffix("]") {
-                current = String(line.dropFirst().dropLast()).lowercased()
-                continue
-            }
-            guard let section = current, let eq = line.firstIndex(of: "=") else { continue }
-            let key = line[..<eq], value = String(line[line.index(after: eq)...])
-            var edits = sections[section] ?? PicasaEdits()
-            if key == "rotate", let n = Int(value.filter(\.isNumber)) { edits.quarterTurns = n % 4 }
-            if key == "crop", let open = value.firstIndex(of: "("), let close = value.firstIndex(of: ")") {
-                // rect64: 64-bit hex (leading zeros dropped) = four 16-bit fractions of 65535:
-                // left, top, right, bottom.
-                let hex = String(value[value.index(after: open)..<close])
-                if let packed = UInt64(hex, radix: 16) {
-                    let f = { (shift: UInt64) in CGFloat((packed >> shift) & 0xFFFF) / 65535 }
-                    let (l, t, r, b) = (f(48), f(32), f(16), f(0))
-                    if r > l, b > t { edits.crop = CGRect(x: l, y: t, width: r - l, height: b - t) }
-                }
-            }
-            sections[section] = edits
-        }
-        iniCache[folder] = sections
-    }
-    return iniCache[folder]?[url.lastPathComponent.lowercased()] ?? PicasaEdits()
-}
-
-/// Applies Picasa's crop (in displayed, EXIF-oriented terms) and then its quarter turns.
-func applying(_ edits: PicasaEdits, to image: CGImage) -> CGImage {
-    var result = image
-    if let crop = edits.crop {
-        let rect = CGRect(x: crop.minX * CGFloat(image.width), y: crop.minY * CGFloat(image.height),
-                          width: crop.width * CGFloat(image.width), height: crop.height * CGFloat(image.height)).integral
-        result = result.cropping(to: rect) ?? result  // CGImage cropping uses a top-left origin
-    }
-    if edits.quarterTurns != 0 {
-        let swap = edits.quarterTurns % 2 == 1
-        let w = swap ? result.height : result.width, h = swap ? result.width : result.height
-        let context = makeContext(width: w, height: h)
-        // y-up CG space: a negative angle turns clockwise on screen.
-        context.translateBy(x: CGFloat(w) / 2, y: CGFloat(h) / 2)
-        context.rotate(by: -CGFloat(edits.quarterTurns) * .pi / 2)
-        context.draw(result, in: CGRect(x: -CGFloat(result.width) / 2, y: -CGFloat(result.height) / 2,
-                                        width: CGFloat(result.width), height: CGFloat(result.height)))
-        result = context.makeImage() ?? result
-    }
-    return result
+/// The image turned `quarterTurns` clockwise, as Picasa shows a `rotate(n)` photo.
+func quarterTurned(_ image: CGImage, _ quarterTurns: Int) -> CGImage {
+    guard quarterTurns % 4 != 0 else { return image }
+    let swap = quarterTurns % 2 == 1
+    let w = swap ? image.height : image.width, h = swap ? image.width : image.height
+    let context = makeContext(width: w, height: h)
+    // y-up CG space: a negative angle turns clockwise on screen.
+    context.translateBy(x: CGFloat(w) / 2, y: CGFloat(h) / 2)
+    context.rotate(by: -CGFloat(quarterTurns) * .pi / 2)
+    context.draw(image, in: CGRect(x: -CGFloat(image.width) / 2, y: -CGFloat(image.height) / 2,
+                                   width: CGFloat(image.width), height: CGFloat(image.height)))
+    return context.makeImage() ?? image
 }
 
 /// Draws `image` into a context of the given size, stretched to fill it.
@@ -304,7 +272,7 @@ struct CXFCompare {
             case "--width": compareWidth = Int(arguments.removeFirst()) ?? compareWidth
             case "--out": outDir = URL(fileURLWithPath: arguments.removeFirst(), isDirectory: true)
             case "--fit": fit = true
-            case "--picasa-ini": applyPicasaINI = true
+            case "--picasa-crop": applyPicasaCrop = true
             case "--rules": ruleNames = arguments.removeFirst().split(separator: ",").map(String.init)
             default:
                 guard !arguments.isEmpty else {
@@ -316,7 +284,7 @@ struct CXFCompare {
         }
         let rules = ruleNames.compactMap { name in allRules.first { $0.name == name } }
         guard !pairs.isEmpty, !rules.isEmpty else {
-            print("usage: cxf_compare [--width N] [--out DIR] [--fit] [--picasa-ini] [--rules a,b] <file.cxf> <picasa-export.jpg> ...")
+            print("usage: cxf_compare [--width N] [--out DIR] [--fit] [--picasa-crop] [--rules a,b] <file.cxf> <picasa-export.jpg> ...")
             print("rules: " + allRules.map { "\($0.name) — \($0.summary)" }.joined(separator: "\n       "))
             exit(2)
         }
@@ -367,21 +335,37 @@ struct CXFCompare {
         let background = CGColor(srgbRed: CGFloat(bg.0) / 255, green: CGFloat(bg.1) / 255, blue: CGFloat(bg.2) / 255, alpha: 1)
 
         // Load each source once; record nodes that cannot be drawn.
-        var images = [String: CGImage]()
-        var usable: [(node: CXFNode, image: CGImage)] = []
+        struct Source { let stored: CGImage; let edits: PicasaEdits; let photoSize: CGSize }
+        struct Usable { let node: CXFNode; let stored: CGImage; let asPicasaShows: CGImage; let quarterTurns: Int }
+        var sources = [String: Source]()
+        var turnedCache = [String: CGImage]()
+        var usable: [Usable] = []
         for node in collage.nodes {
             guard let raw = node.src, let path = WinePathTranslator.translate(raw) else { continue }
-            if images[path] == nil {
+            if sources[path] == nil {
                 guard let loaded = loadImage(path, maxPixel: 1024) else { _ = note("missing source \(path)"); continue }
-                let edits = picasaEdits(for: path)
+                let edits = PicasaINI.edits(forPhotoAt: path)
                 if edits.quarterTurns != 0 || edits.crop != nil {
-                    _ = note("Picasa.ini \(applyPicasaINI ? "applied" : "ignored"): rotate \(edits.quarterTurns)×90°"
-                             + (edits.crop.map { String(format: ", crop %.3f,%.3f %.3f×%.3f", $0.minX, $0.minY, $0.width, $0.height) } ?? "")
+                    _ = note("Picasa.ini rotate \(edits.quarterTurns)×90°"
+                             + (edits.crop.map { String(format: ", crop %.3f,%.3f %.3f×%.3f (%@)", $0.minX, $0.minY,
+                                                        $0.width, $0.height, applyPicasaCrop ? "applied" : "ignored") } ?? "")
                              + " — \(URL(fileURLWithPath: path).lastPathComponent)")
                 }
-                images[path] = applyPicasaINI ? applying(edits, to: loaded.image) : loaded.image
+                let stored = applyPicasaCrop ? cropped(loaded.image, to: edits.crop) : loaded.image
+                sources[path] = Source(stored: stored, edits: edits,
+                                       photoSize: ImageDimensions.orientedPixelSize(at: path) ?? .zero)
             }
-            usable.append((node, images[path]!))
+            let source = sources[path]!
+            // The importer's own decision about whether the edit predates the collage.
+            let turns = CXFCanvasGeometry.quarterTurnsInEffect(for: node, canvasSize: canvas,
+                                                               photoSize: source.photoSize, edits: source.edits)
+            if turns != source.edits.quarterTurns {
+                _ = note("Picasa.ini rotate \(source.edits.quarterTurns)×90° postdates the collage, not applied — "
+                         + URL(fileURLWithPath: path).lastPathComponent)
+            }
+            let key = "\(path)#\(turns)"
+            if turnedCache[key] == nil { turnedCache[key] = quarterTurned(source.stored, turns) }
+            usable.append(Usable(node: node, stored: source.stored, asPicasaShows: turnedCache[key]!, quarterTurns: turns))
         }
 
         let rotations = Set(usable.map { Int(($0.node.theta * 180 / .pi).rounded()) % 360 }).sorted()
@@ -391,9 +375,10 @@ struct CXFCompare {
 
         var best: (rule: String, error: Double, raster: Raster)?
         for rule in rules {
-            let layers = usable.map {
-                Layer(image: $0.image, box: CXFCanvasGeometry.boxSize(for: $0.node, canvasSize: canvas),
-                      theta: $0.node.theta, center: rule.center($0.node, canvas, collage.theme))
+            let layers = usable.map { item -> Layer in
+                let placement = rule.place(item.node, canvas, collage.theme, item.quarterTurns)
+                return Layer(image: rule.handlesPicasaRotation ? item.stored : item.asPicasaShows,
+                             box: placement.size, theta: placement.clockwiseRotation, center: placement.center)
             }
             let rendered = composite(layers, width: width, height: height, scale: scale, background: background)
             let e = error(rendered, referenceRaster, background: bg)

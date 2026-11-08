@@ -82,25 +82,42 @@ enum CollageImporter {
                 continue
             }
 
-            let size = CXFCanvasGeometry.boxSize(for: node, canvasSize: canvasSize)
-            let position = CXFCanvasGeometry.layerCenter(for: node, canvasSize: canvasSize, theme: collage.theme)
-            // Picasa's w/h are in displayed (EXIF-oriented) terms, as is the renderer.
+            // EXIF-oriented, as the renderer draws it; it matches `placement.size`, which is the
+            // photo before any Picasa.ini rotation.
             let sourceResolution = ImageDimensions.orientedPixelSize(at: resolved) ?? .zero
-            warnOnAspectMismatch(node: node, size: size, sourceResolution: sourceResolution)
+
+            // Picasa lays out the photo with its Picasa.ini edits applied. Rotation is folded
+            // into the layer's size and angle; crops are not imported yet.
+            let edits = PicasaINI.edits(forPhotoAt: resolved)
+            let quarterTurns = CXFCanvasGeometry.quarterTurnsInEffect(
+                for: node, canvasSize: canvasSize, photoSize: sourceResolution, edits: edits
+            )
+            if quarterTurns != 0 {
+                Logger.debug("Picasa import: applying Picasa.ini rotate(\(quarterTurns)) to '\(resolved)'")
+            } else if edits.quarterTurns != 0 {
+                Logger.debug("Picasa import: ignoring Picasa.ini rotate(\(edits.quarterTurns)) on '\(resolved)' — the collage box matches the unrotated photo, so the edit postdates the collage")
+            }
+            if edits.crop != nil {
+                Logger.warn("Picasa import: Picasa.ini crop on '\(resolved)' is not imported; the whole photo is shown")
+            }
+            let placement = CXFCanvasGeometry.layerPlacement(
+                for: node, canvasSize: canvasSize, theme: collage.theme, quarterTurns: quarterTurns
+            )
+            warnOnAspectMismatch(node: node, size: placement.size, sourceResolution: sourceResolution)
 
             let layer = PhotoLayer(
                 photoPath: resolved,
                 collectionID: collection.id,
                 photoID: photo.id,
-                position: position,
-                size: size,
+                position: placement.center,
+                size: placement.size,
                 // Picasa's positive theta is clockwise on screen, but Pearblossom's renderer
                 // (CGAffineTransform(rotationAngle:) on the CIImage) turns positive angles
                 // counter-clockwise, so the sign must be negated. Verified on sam-train-2:
                 // scan_104 at theta 4.712 (Picasa: cab left, smoke top) rendered 180° off
                 // when stored as +theta. The centre (layerCenter) is canvas-space and is
                 // unaffected because the layer rotates about its own centre.
-                rotation: -node.theta,
+                rotation: -placement.clockwiseRotation,
                 zOrder: zOrder,
                 opacity: node.alpha ?? 1.0,
                 sourceResolution: sourceResolution,

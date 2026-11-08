@@ -51,6 +51,71 @@ enum CXFCanvasGeometry {
             : CGSize(width: longEdge, height: shortEdge)
     }
 
+    /// Where and how a node's photo is drawn: the layer centre and box in canvas points, and its
+    /// total rotation in radians **clockwise on screen** (Picasa's convention; Pearblossom's
+    /// renderer turns the other way, so the importer stores the negation).
+    struct LayerPlacement: Equatable {
+        var center: CGPoint
+        var size: CGSize
+        var clockwiseRotation: Double
+    }
+
+    /// Places a node, accounting for a `Picasa.ini` rotation of the source photo.
+    ///
+    /// Picasa lays out the *rotated* photo: the node's `w × h` box holds it after
+    /// `quarterTurns` clockwise quarter turns. Pearblossom draws the photo as stored, so the
+    /// layer instead gets the box with its sides swapped (for an odd number of turns) and the
+    /// quarter turns added to `theta`. Rotating about the same centre, that covers exactly the
+    /// footprint Picasa draws, with the content the right way up.
+    static func layerPlacement(for node: CXFNode, canvasSize: CGSize, theme: String,
+                               quarterTurns: Int = 0) -> LayerPlacement {
+        let box = boxSize(for: node, canvasSize: canvasSize)
+        let turns = ((quarterTurns % 4) + 4) % 4
+        return LayerPlacement(
+            center: layerCenter(for: node, canvasSize: canvasSize, theme: theme),
+            size: turns % 2 == 1 ? CGSize(width: box.height, height: box.width) : box,
+            clockwiseRotation: node.theta + Double(turns) * .pi / 2
+        )
+    }
+
+    /// The Picasa.ini quarter turns that were in effect when Picasa laid this node out.
+    ///
+    /// `Picasa.ini` records a photo's *current* edits, which can postdate the collage: Picasa
+    /// does not re-lay-out a saved collage when a photo is rotated later. The node's box
+    /// records the photo's shape at layout time, so an odd number of turns is applied only
+    /// when the box matches the rotated photo better than the photo as stored. (`sam-train-2`'s
+    /// scans carry `rotate(3)` but have portrait boxes like the raw scans; `iona-office`'s carry
+    /// `rotate(1)` and have portrait boxes for landscape photos.) A crop may postdate the
+    /// collage too, so every combination — no edits, rotation only, crop only, both — is
+    /// compared with the box and the closest wins; ties go to applying the edits. Picasa's boxes
+    /// match the laid-out photo's aspect to about 0.01%, so even `scan1`'s near-coincidence
+    /// (raw scan 0.7270, rotated crop 0.7068, box 0.7271) separates cleanly. Even turns leave
+    /// the shape unchanged and cannot be tested, so they are trusted.
+    ///
+    /// - Parameter photoSize: the photo's EXIF-oriented pixel size, before Picasa.ini edits.
+    static func quarterTurnsInEffect(for node: CXFNode, canvasSize: CGSize, photoSize: CGSize,
+                                     edits: PicasaEdits) -> Int {
+        let turns = edits.quarterTurns
+        let box = boxSize(for: node, canvasSize: canvasSize)
+        guard turns % 2 == 1, photoSize.width > 0, photoSize.height > 0,
+              box.width > 0, box.height > 0 else { return turns }
+
+        let stored = Double(photoSize.width / photoSize.height)
+        let cropFactor = edits.crop.map { $0.height > 0 ? Double($0.width / $0.height) : 1 }
+        let boxAspect = Double(box.width / box.height)
+        func mismatch(_ aspect: Double) -> Double { abs(log(boxAspect / aspect)) }
+
+        // (aspect, rotation in effect), most-edited first so that ties apply the edits.
+        var candidates: [(aspect: Double, rotated: Bool)] = []
+        if let cropFactor { candidates.append((1 / (stored * cropFactor), true)) }
+        candidates.append((1 / stored, true))
+        if let cropFactor { candidates.append((stored * cropFactor, false)) }
+        candidates.append((stored, false))
+
+        let best = candidates.min { mismatch($0.aspect) < mismatch($1.aspect) }!
+        return best.rotated ? turns : 0
+    }
+
     /// The node's unrotated box size in canvas points (`w`, `h` are fractions of the canvas).
     static func boxSize(for node: CXFNode, canvasSize: CGSize) -> CGSize {
         CGSize(width: node.w * Double(canvasSize.width), height: node.h * Double(canvasSize.height))

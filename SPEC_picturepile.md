@@ -112,7 +112,7 @@ Implemented in `CXFCanvasGeometry.layerCenter`. Verified with `Scripts/cxf_compa
 | $(W_{\text{box}}/2, W_{\text{box}}/2)$ — previous rule | 52.6 | identical for landscape photos; wrong by $\tfrac{1}{2}(H-W)$ along the rotated diagonal for portrait ones (e.g. `crane` 108.9 vs 2.7) |
 | $(W_{\text{box}}/2, H_{\text{box}}/2)$ — plain rotation of the box | 58.9 | |
 
-A per-photo offset search on top of this rule leaves residuals inside the 2.5 pt fit resolution (`sam-train-2`, `sam-train-3`). Nearly all the remaining error is from `Picasa.ini` edits, which the importer does not yet read (§5.4).
+A per-photo offset search on top of this rule leaves residuals inside the 2.5 pt fit resolution (`sam-train-2`, `sam-train-3`). Most of the remaining error comes from `Picasa.ini` crops and tone filters, which are not imported (§5.4).
 
 **Rotation sign.** Picasa's positive `theta` is clockwise on screen. Pearblossom's renderers apply `CGAffineTransform(rotationAngle:)` to a y-up `CIImage`, which turns positive angles counter-clockwise, so the layer's `rotation` is stored as $-\theta$. Only the photo's own rotation is negated. The centre above is computed in canvas space with Picasa's clockwise $\theta$. (Storing $+\theta$ turned `sam-train-2`'s 270° photos upside down.)
 
@@ -140,15 +140,21 @@ $$\text{Angle in Degrees} = \theta \times \left(\frac{180}{\pi}\right)$$
 
 ```
 
-### 5.4 Source Edits in `Picasa.ini` (not yet imported)
+### 5.4 Source Edits in `Picasa.ini`
 
-Picasa keeps non-destructive edits in a `Picasa.ini` (or `.picasa.ini`) file in each photo's folder, under a `[filename.jpg]` section. They are applied before the photo is placed, and the node's `w`/`h` describe the edited photo:
+Picasa keeps non-destructive edits in a `Picasa.ini` (or `.picasa.ini`) file in each photo's folder, under a `[filename.jpg]` section (parsed by `Import/PicasaINI.swift`). Picasa lays a collage out using the edited photo, so the node's `w`/`h` describe the photo with whatever edits it had **at layout time**:
 
 * **`rotate=rotate(n)`**: $n$ quarter turns clockwise, on top of any EXIF orientation.
 * **`crop=rect64(hex)`**: a 64-bit hex value, with leading zeros dropped, packing four 16-bit fractions of 65535: left, top, right, bottom of the displayed image.
 * **`filters=…`**: tone and colour filters (`autolight`, `finetune2`, …). Out of scope.
 
-The importer ignores these today. With rotate and crop applied, `Scripts/cxf_compare.sh --picasa-ini` scores `iona-office` 3.0 instead of 69.0 and `sam-trains` 13.1 instead of 64.9. The crop-then-rotate order is assumed, because no sample has both edits.
+**Rotation is imported.** A photo turned $n$ quarter turns covers the same footprint as the stored photo in a box with $w$ and $h$ swapped (for odd $n$), rotated a further $n \cdot 90°$ about the same centre. So `CXFCanvasGeometry.layerPlacement` keeps the §5.1 centre, swaps the box, and adds the turns to $\theta$; no model change is needed, and `sourceResolution` (the stored photo) matches the swapped box.
+
+**Edits can postdate the collage.** `Picasa.ini` holds a photo's *current* edits, and Picasa does not re-lay-out a saved collage when a photo is edited later. `sam-train-2`'s scans carry `rotate(3)`, but their boxes are portrait like the raw scans and Picasa's export shows them unrotated. `CXFCanvasGeometry.quarterTurnsInEffect` therefore compares the box's aspect with each combination (no edits, rotation only, crop only, both) and applies the rotation only when a rotated combination is closest. Ties go to applying the edits. Boxes match the laid-out photo to about 0.01%, which separates even `scan1` (raw scan 0.7270, rotated crop 0.7068, box 0.7271 → edits postdate). Even turns do not change the shape, so they cannot be tested and are always applied; no sample has them.
+
+Measured with `Scripts/cxf_compare.sh` (mean content error): `iona-office` ×4 69 → 3.0, with no other file changing; mean over the 22 picturepile references 20.5 → 8.4.
+
+**Crops are not imported.** The importer logs a warning and shows the whole photo, because the model's `cropRect` is not used by either renderer. `--picasa-crop` previews them in the harness: `sam-trains` 64.9 → 13.1. The crop-then-rotate order is assumed, because no sample has both edits in effect.
 
 ---
 
