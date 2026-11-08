@@ -58,17 +58,38 @@ enum CXFCanvasGeometry {
 
     /// The canvas-space centre (top-left origin, y down) of a node's layer.
     ///
-    /// picturepile: anchor plus the half-width rotated by theta on both axes; multiexp: plain
-    /// rotation of the box about its top-left anchor. See `SPEC_picturepile.md` §5.1.
+    /// **picturepile**: Picasa models each photo as a square whose side is the photo's long
+    /// edge `L = max(w, h)` (the node's `scale` attribute is that same long edge, in units where
+    /// the canvas's long edge is 1024). `(x, y)` is the square's top-left corner before
+    /// rotation, and the photo is centred in the square, which is rotated clockwise by `theta`
+    /// about that corner:
+    ///
+    ///     centre = (x·W, y·H) + R(θ)·(L/2, L/2)
+    ///     R(θ)·(a, b) = (a·cosθ − b·sinθ,  a·sinθ + b·cosθ)     (y down, so clockwise)
+    ///
+    /// For a landscape photo `L = w`, which is the "half-width on both axes" rule this replaced;
+    /// it only diverged for portrait photos, where it used the short edge. Verified with
+    /// `Scripts/cxf_compare.sh` against Picasa's own exports (22 collages; θ = 0, ±small, 30°,
+    /// 60°, 90°, 270°): mean content error 17.3 vs 44.5 for the half-width rule, never worse on
+    /// any file, and per-photo residuals within the 2.5 pt fit resolution on the train scans.
+    ///
+    /// **multiexp**: plain rotation of the box about its top-left anchor, `(w/2, h/2)`. Its
+    /// nodes are all θ = 0 full-canvas exposures, so this was never the source of a mismatch,
+    /// and it has not been measured against Picasa.
     static func layerCenter(for node: CXFNode, canvasSize: CGSize, theme: String) -> CGPoint {
         let size = boxSize(for: node, canvasSize: canvasSize)
-        let halfW = Double(size.width) / 2
-        let halfH = Double(size.height) / 2
+        let offset: (a: Double, b: Double)
+        if theme == "picturepile" {
+            let halfLongEdge = Double(max(size.width, size.height)) / 2
+            offset = (halfLongEdge, halfLongEdge)
+        } else {
+            offset = (Double(size.width) / 2, Double(size.height) / 2)
+        }
         let cosTheta = cos(node.theta)
         let sinTheta = sin(node.theta)
-        let offsetHalfH = theme == "picturepile" ? halfW : halfH
-        let centerX = node.x * Double(canvasSize.width) + halfW * cosTheta - offsetHalfH * sinTheta
-        let centerY = node.y * Double(canvasSize.height) + halfW * sinTheta + offsetHalfH * cosTheta
-        return CGPoint(x: centerX, y: centerY)
+        return CGPoint(
+            x: node.x * Double(canvasSize.width) + offset.a * cosTheta - offset.b * sinTheta,
+            y: node.y * Double(canvasSize.height) + offset.a * sinTheta + offset.b * cosTheta
+        )
     }
 }

@@ -21,12 +21,12 @@ struct CXFBackground {
 
 /// A single `<node>` element — one photo layer in the collage.
 struct CXFNode {
-    var x: Double = 0        // normalized center X [0,1]
-    var y: Double = 0        // normalized center Y [0,1]
-    var w: Double = 0        // normalized width  [0,1]
+    var x: Double = 0        // normalized anchor X [0,1] — not the centre; see CXFCanvasGeometry.layerCenter
+    var y: Double = 0        // normalized anchor Y [0,1]
+    var w: Double = 0        // normalized width  [0,1], in the photo's displayed orientation
     var h: Double = 0        // normalized height [0,1]
-    var theta: Double = 0    // rotation in radians
-    var scale: Double = 1    // parsed but unused by Pearblossom
+    var theta: Double = 0    // rotation in radians, clockwise on screen
+    var scale: Double = 1    // photo long edge (canvas long edge = 1024); parsed but unused
     var alpha: Double?       // per-node opacity [0,1], nil → renderer default
     var theme: String?       // e.g. "noborder", "whiteframe"
     var src: String?         // Wine/Windows source path

@@ -52,8 +52,9 @@ The parser must accept valid XML matching the following hierarchy:
 
 Order of `<node>` elements in XML dictates the **Z-Index** layer order (first node = bottom layer, last node = top layer).
 
-* **`x`, `y**`: Normalized center position relative to canvas dimensions $[0.0, 1.0]$.
-* **`w`, `h**`: Normalized width and height bounds relative to canvas dimensions $[0.0, 1.0]$.
+* **`x`, `y**`: Normalized anchor — the top-left corner, before rotation, of the square that holds the photo (see §5.1) — relative to canvas dimensions $[0.0, 1.0]$. *Not* the centre.
+* **`w`, `h**`: Normalized width and height bounds relative to canvas dimensions $[0.0, 1.0]$, in the photo's displayed orientation (after EXIF orientation and any `Picasa.ini` rotation).
+* **`scale`**: The photo's long edge, in units where the canvas's long edge is 1024. Redundant with `max(w·W, h·H)`; not read by the importer.
 * **`theta`**: Rotation angle in **radians** ($0.0$ to $2\pi$). $6.283185 \approx 0^\circ$ rotation.
 * **`<src>`**: Path string containing source photo location. Must undergo path normalization.
 
@@ -93,23 +94,27 @@ To place an image onto the canvas at target output dimensions $(W_{\text{canvas}
 
 ### 5.1 Anchor (Top-Left) Calculation
 
-`x` addresses the node's **left edge** and `y` its **top edge before rotation** — *not* its center. (Verified against observed Picasa output: reading them as centers would place nodes more than half off-canvas, and x matches Picasa's own export to <0.5% while the recomputed content bounding box matches the photo aspect exactly.)
+Picasa models each photo as sitting in the centre of a **square whose side is the photo's long edge**, $L = \max(W_{\text{box}}, H_{\text{box}})$ (the node's `scale` attribute is the same $L$). `x`, `y` address that square's top-left corner before rotation, and the square is rotated clockwise by $\theta$ about that corner:
 
-$$X_{\text{anchor}} = x \times W_{\text{canvas}}$$
+$$X_{\text{anchor}} = x \times W_{\text{canvas}}, \qquad Y_{\text{anchor}} = y \times H_{\text{canvas}}$$
 
-$$Y_{\text{anchor}} = y \times H_{\text{canvas}}$$
+$$X_{\text{center}} = X_{\text{anchor}} + \tfrac{L}{2}\cos\theta - \tfrac{L}{2}\sin\theta$$
 
-and then the centre offset below.
+$$Y_{\text{center}} = Y_{\text{anchor}} + \tfrac{L}{2}\sin\theta + \tfrac{L}{2}\cos\theta$$
 
-The rendered center is the anchor plus the box's half-extents rotated clockwise by $\theta$ — but Picasa uses the half-**width** for **both** axes (a half-extent mix-up in its own layout code, the same class of bug this importer once had, with halfW instead of halfH):
+(Canvas space has a top-left origin with y down, so this rotation is clockwise on screen.) At $\theta = 0$ a landscape photo therefore sits $\tfrac{1}{2}(W_{\text{box}} - H_{\text{box}})$ lower than its anchor suggests, and a portrait photo $\tfrac{1}{2}(H_{\text{box}} - W_{\text{box}})$ further right. Because the offset scales with the box it differs per node, which is what makes a Picasa panorama's horizon line up.
 
-$$X_{\text{center}} = x \times W_{\text{canvas}} + \tfrac{W_{\text{box}}}{2}\cos\theta - \tfrac{W_{\text{box}}}{2}\sin\theta$$
+Implemented in `CXFCanvasGeometry.layerCenter`. Verified with `Scripts/cxf_compare.sh`, which composites the real source photos with the CXF geometry and compares against Picasa's own exports (mean content error, 0–255, over 22 collages with θ = 0, small tilts, 30°, 60°, 90° and 270°):
 
-$$Y_{\text{center}} = y \times H_{\text{canvas}} + \tfrac{W_{\text{box}}}{2}\sin\theta + \tfrac{W_{\text{box}}}{2}\cos\theta$$
+| Rule | Mean error | Notes |
+| --- | --- | --- |
+| $(L/2, L/2)$ — this rule | 20.5 | never worse than the alternatives on any file |
+| $(W_{\text{box}}/2, W_{\text{box}}/2)$ — previous rule | 52.6 | identical for landscape photos; wrong by $\tfrac{1}{2}(H-W)$ along the rotated diagonal for portrait ones (e.g. `crane` 108.9 vs 2.7) |
+| $(W_{\text{box}}/2, H_{\text{box}}/2)$ — plain rotation of the box | 58.9 | |
 
-At $\theta = 0$ this places the box $\tfrac{1}{2}(W_{\text{box}} - H_{\text{box}})$ lower than the stored $y$ implies. Because the offset scales with the box, it differs per node — which is what makes a Picasa panorama's horizon line up and an unadjusted render's not. Derived empirically by compositing the real source photos with the CXF geometry and comparing against Picasa's own exports; see the table in `PLANS.md`. There is **no horizontal counterpart** — offsetting x as well, or x alone, measurably worsens every sample.
+A per-photo offset search on top of this rule leaves residuals inside the 2.5 pt fit resolution (`sam-train-2`, `sam-train-3`). Nearly all the remaining error is from `Picasa.ini` edits, which the importer does not yet read (§5.4).
 
-Both terms must use the same sign convention: Picasa's positive `theta` is clockwise, which matches Pearblossom's renderer, so `rotation` is stored as $+\theta$ — the same sign as the offsets above. Negating the rotation while keeping the clockwise offsets tilts each photo the wrong way (up to $2\theta$ apart from Picasa).
+**Rotation sign.** Picasa's positive `theta` is clockwise on screen. Pearblossom's renderers apply `CGAffineTransform(rotationAngle:)` to a y-up `CIImage`, which turns positive angles counter-clockwise, so the layer's `rotation` is stored as $-\theta$. Only the photo's own rotation is negated. The centre above is computed in canvas space with Picasa's clockwise $\theta$. (Storing $+\theta$ turned `sam-train-2`'s 270° photos upside down.)
 
 ### 5.2 Size Calculation
 
@@ -119,7 +124,7 @@ $$Height = h \times H_{\text{canvas}}$$
 
 ### 5.3 Rotation & Bounding Box
 
-Rotate the image about the derived center $(X_{\text{center}}, Y_{\text{center}})$, computed in §5.1, by angle $\theta$ (in radians):
+Rotate the image clockwise about the derived center $(X_{\text{center}}, Y_{\text{center}})$, computed in §5.1, by angle $\theta$ (in radians). The layer stores it negated; see "Rotation sign" in §5.1.
 
 
 $$\text{Angle in Degrees} = \theta \times \left(\frac{180}{\pi}\right)$$
@@ -129,11 +134,21 @@ $$\text{Angle in Degrees} = \theta \times \left(\frac{180}{\pi}\right)$$
       │ Canvas                                       │
       │           (X_center, Y_center)               │
       │                  ┌───────┐                   │
-      │                  │ Image │ ↺ theta (rad)     │
+      │                  │ Image │ ↻ theta (rad)     │
       │                  └───────┘                   │
       └──────────────────────────────────────────────┘ (W_canvas, H_canvas)
 
 ```
+
+### 5.4 Source Edits in `Picasa.ini` (not yet imported)
+
+Picasa keeps non-destructive edits in a `Picasa.ini` (or `.picasa.ini`) file in each photo's folder, under a `[filename.jpg]` section. They are applied before the photo is placed, and the node's `w`/`h` describe the edited photo:
+
+* **`rotate=rotate(n)`**: $n$ quarter turns clockwise, on top of any EXIF orientation.
+* **`crop=rect64(hex)`**: a 64-bit hex value, with leading zeros dropped, packing four 16-bit fractions of 65535: left, top, right, bottom of the displayed image.
+* **`filters=…`**: tone and colour filters (`autolight`, `finetune2`, …). Out of scope.
+
+The importer ignores these today. With rotate and crop applied, `Scripts/cxf_compare.sh --picasa-ini` scores `iona-office` 3.0 instead of 69.0 and `sam-trains` 13.1 instead of 64.9. The crop-then-rotate order is assumed, because no sample has both edits.
 
 ---
 
