@@ -8,9 +8,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
 
-        // Set app icon from bundled Resources
-        if let iconURL = Bundle.module.url(forResource: "AppIcon", withExtension: "icns"),
-           let iconImage = NSImage(contentsOf: iconURL) {
+        // Set the app icon. Inside a packaged .app the icon is in the app's own Resources
+        // (Info.plist's CFBundleIconFile); the SwiftPM resource bundle only exists next to a
+        // `swift run` binary. Bundle.module must not be touched in a .app: its generated
+        // accessor looks for the resource bundle at the .app root and crashes when it is missing.
+        let iconURL = Bundle.main.url(forResource: "AppIcon", withExtension: "icns")
+            ?? Bundle.module.url(forResource: "AppIcon", withExtension: "icns")
+        if let iconURL, let iconImage = NSImage(contentsOf: iconURL) {
             NSApp.applicationIconImage = iconImage
         }
 

@@ -46,6 +46,20 @@ swift run -c release Pearblossom
 Built binaries are placed in `.build/debug/Pearblossom` (debug) and
 `.build/release/Pearblossom` (release).
 
+### As an application
+
+```bash
+Scripts/make_app.sh            # builds a release Pearblossom.app into ~/Applications
+Scripts/make_app.sh /Applications   # or choose another folder
+open ~/Applications/Pearblossom.app
+```
+
+The script builds in release mode, assembles the `.app` (executable, `Info.plist`, icon) and
+signs it ad hoc, which is enough for an app built and run on the same Mac. It is safe to re-run
+to update the installed copy: quit the app first. Settings live under the bundle identifier
+`com.pearblossom`, so they start fresh the first time you move from `swift run`; collections
+and collages are untouched because they live in `~/Pictures/Pearblossom`.
+
 ### From Xcode
 
 ```bash
