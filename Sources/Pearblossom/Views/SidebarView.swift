@@ -69,7 +69,11 @@ struct SidebarView: View {
 
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
-            AppSettings.shared.lastCXFImportDirectory = url.deletingLastPathComponent()
+            // Remember the folder the panel was showing, not the chosen file's parent: the panel
+            // resolves symlinks, and Picasa collection folders are often full of links to files
+            // elsewhere (`keep/sam-trains.cxf -> ../Collages1.cxf`), which would send the next
+            // import to the link's target folder instead of the one browsed.
+            AppSettings.shared.lastCXFImportDirectory = panel.directoryURL ?? url.deletingLastPathComponent()
             cxfImportRequest = CXFImportRequest(url: url)
         }
     }
