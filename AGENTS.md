@@ -29,6 +29,7 @@ A macOS desktop app for creating multi-perspective photo collages — overlappin
 
 - Build: `swift build`
 - Run: `swift run` (CLI mode, if applicable) or open in Xcode via `open Package.swift`
+- Check Picasa import placement: `Scripts/cxf_compare.sh [--fit] [--out DIR] <file.cxf> <picasa-export.jpg> …` — re-run it on the reference collages after any change to `CXFCanvasGeometry` (see `SPEC_picturepile.md` §5.1)
 - No third-party package dependencies — ever
 
 ## Git Commits

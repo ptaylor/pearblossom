@@ -82,41 +82,8 @@ enum CollageImporter {
                 continue
             }
 
-            let size = CGSize(width: node.w * Double(canvasW), height: node.h * Double(canvasH))
-            let halfW = size.width / 2
-            let halfH = size.height / 2
-            let cosTheta = cos(node.theta)
-            let sinTheta = sin(node.theta)
-
-            // Picasa positions the box's centre at the anchor plus the half-extents rotated by
-            // `theta` — but it uses the half-WIDTH for both axes (the same class of half-extent
-            // mix-up this importer used to have, with halfW instead of halfH):
-            //     centre = (x·W + halfW·cosθ − halfW·sinθ, y·H + halfW·sinθ + halfW·cosθ)
-            // At θ = 0 that reduces to centre = (x·W + halfW, y·H + halfW), i.e. the box sits
-            // (halfW − halfH) lower than the stored y implies — which is why a Picasa panorama's
-            // horizon lines up and ours didn't, and why the effect varies per photo.
-            //
-            // Derived empirically by compositing the real source photos with the CXF geometry
-            // and comparing against Picasa's own exports (mean pixel error, lower is better).
-            // Files below are a 25:20 landscape, a 297:210 landscape and a 297:210 portrait:
-            //     no correction                     29.8 / 25.6 / 10.6
-            //     best uniform y shift               5.8 / 13.8 /  4.6
-            //     θ=0 offset (halfW−halfH only)      1.3 / 10.6 /  1.9
-            //     this rule                          1.3 /  8.3 /  0.9
-            // On the shadow-free file it beats a free per-photo (dx, dy) fit (1.3 vs 2.3), which
-            // is what identifies it as the rule rather than a fit. Applying the same offset to x
-            // as well, or offsetting x alone, both make every file substantially worse — there
-            // is no horizontal counterpart.
-            //
-            // Not yet verified for portrait-aspect photos (where halfW < halfH, so the offset
-            // inverts) and left out of `multiexp` for now, since all evidence is picturepile.
-            let useHalfExtentOffset = collage.theme == "picturepile"
-            // Second half-extent of the rotated offset: halfW for picturepile (see above),
-            // halfH for multiexp, which keeps the symmetric behaviour until verified.
-            let offsetHalfH = useHalfExtentOffset ? Double(halfW) : Double(halfH)
-            let centerX = node.x * Double(canvasW) + Double(halfW) * cosTheta - offsetHalfH * sinTheta
-            let centerY = node.y * Double(canvasH) + Double(halfW) * sinTheta + offsetHalfH * cosTheta
-            let position = CGPoint(x: centerX, y: centerY)
+            let size = CXFCanvasGeometry.boxSize(for: node, canvasSize: canvasSize)
+            let position = CXFCanvasGeometry.layerCenter(for: node, canvasSize: canvasSize, theme: collage.theme)
             // Picasa's w/h are in displayed (EXIF-oriented) terms, as is the renderer.
             let sourceResolution = ImageDimensions.orientedPixelSize(at: resolved) ?? .zero
             warnOnAspectMismatch(node: node, size: size, sourceResolution: sourceResolution)
@@ -131,7 +98,7 @@ enum CollageImporter {
                 // (CGAffineTransform(rotationAngle:) on the CIImage) turns positive angles
                 // counter-clockwise, so the sign must be negated. Verified on sam-train-2:
                 // scan_104 at theta 4.712 (Picasa: cab left, smoke top) rendered 180° off
-                // when stored as +theta. The centre offsets above are canvas-space and are
+                // when stored as +theta. The centre (layerCenter) is canvas-space and is
                 // unaffected because the layer rotates about its own centre.
                 rotation: -node.theta,
                 zOrder: zOrder,

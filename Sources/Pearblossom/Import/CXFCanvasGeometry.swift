@@ -50,4 +50,25 @@ enum CXFCanvasGeometry {
             ? CGSize(width: shortEdge, height: longEdge)
             : CGSize(width: longEdge, height: shortEdge)
     }
+
+    /// The node's unrotated box size in canvas points (`w`, `h` are fractions of the canvas).
+    static func boxSize(for node: CXFNode, canvasSize: CGSize) -> CGSize {
+        CGSize(width: node.w * Double(canvasSize.width), height: node.h * Double(canvasSize.height))
+    }
+
+    /// The canvas-space centre (top-left origin, y down) of a node's layer.
+    ///
+    /// picturepile: anchor plus the half-width rotated by theta on both axes; multiexp: plain
+    /// rotation of the box about its top-left anchor. See `SPEC_picturepile.md` §5.1.
+    static func layerCenter(for node: CXFNode, canvasSize: CGSize, theme: String) -> CGPoint {
+        let size = boxSize(for: node, canvasSize: canvasSize)
+        let halfW = Double(size.width) / 2
+        let halfH = Double(size.height) / 2
+        let cosTheta = cos(node.theta)
+        let sinTheta = sin(node.theta)
+        let offsetHalfH = theme == "picturepile" ? halfW : halfH
+        let centerX = node.x * Double(canvasSize.width) + halfW * cosTheta - offsetHalfH * sinTheta
+        let centerY = node.y * Double(canvasSize.height) + halfW * sinTheta + offsetHalfH * cosTheta
+        return CGPoint(x: centerX, y: centerY)
+    }
 }
