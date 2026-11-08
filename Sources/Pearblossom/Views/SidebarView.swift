@@ -12,7 +12,6 @@ struct SidebarView: View {
 
     @Binding var selectedProject: CollageProject?
     @State private var selectedTab: SidebarTab = .collages
-    @State private var showCXFPicker = false
     @State private var cxfImportRequest: CXFImportRequest? = nil
 
     var body: some View {
@@ -38,21 +37,7 @@ struct SidebarView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .triggerImportCollage)) { _ in
-            showCXFPicker = true
-        }
-        .fileImporter(
-            isPresented: $showCXFPicker,
-            allowedContentTypes: [UTType(filenameExtension: "cxf") ?? .data],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                if let url = urls.first {
-                    cxfImportRequest = CXFImportRequest(url: url)
-                }
-            case .failure(let error):
-                Logger.warn("Picasa import file picker failed: \(error.localizedDescription)")
-            }
+            presentCXFPicker()
         }
         .sheet(item: $cxfImportRequest) { request in
             ImportCollageDialog(cxfURL: request.url) { project, _, skipped in
@@ -70,6 +55,22 @@ struct SidebarView: View {
 
                 NotificationCenter.default.post(name: .collagesDidChange, object: nil)
             }
+        }
+    }
+
+    /// Asks for a `.cxf` file, starting in the folder the previous import came from.
+    private func presentCXFPicker() {
+        let panel = NSOpenPanel()
+        panel.title = "Import Picasa Collage"
+        panel.allowedContentTypes = [UTType(filenameExtension: "cxf") ?? .data]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.directoryURL = AppSettings.shared.lastCXFImportDirectory
+
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            AppSettings.shared.lastCXFImportDirectory = url.deletingLastPathComponent()
+            cxfImportRequest = CXFImportRequest(url: url)
         }
     }
 }

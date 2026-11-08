@@ -27,6 +27,8 @@ final class AppSettings: ObservableObject {
         static let defaultExportFormat = "defaultExportFormat"
         static let defaultJPEGQuality = "defaultJPEGQuality"
         static let defaultExportScale = "defaultExportScale"
+        static let lastCXFImportDirectory = "lastCXFImportDirectory"
+        static let lastCollageExportDirectory = "lastCollageExportDirectory"
     }
 
     // MARK: - Defaults
@@ -165,6 +167,20 @@ final class AppSettings: ObservableObject {
         didSet {
             defaults.set(defaultExportScale, forKey: Keys.defaultExportScale)
         }
+    }
+
+    /// Folder the last Picasa `.cxf` was imported from; the next import dialog starts here.
+    /// Nil until an import has been chosen, or if the folder no longer exists.
+    var lastCXFImportDirectory: URL? {
+        get { existingDirectory(forKey: Keys.lastCXFImportDirectory) }
+        set { defaults.set(newValue?.path, forKey: Keys.lastCXFImportDirectory) }
+    }
+
+    /// Folder the last collage was exported to; the next export dialog starts here.
+    /// Kept separate from the import folder. Nil until an export has been saved, or if the folder no longer exists.
+    var lastCollageExportDirectory: URL? {
+        get { existingDirectory(forKey: Keys.lastCollageExportDirectory) }
+        set { defaults.set(newValue?.path, forKey: Keys.lastCollageExportDirectory) }
     }
 
     /// The ID of the currently expanded collection.
@@ -334,6 +350,14 @@ final class AppSettings: ObservableObject {
     }
 
     // MARK: - Helpers
+
+    /// Reads a stored folder path, returning nil if it is unset or no longer a directory.
+    private func existingDirectory(forKey key: String) -> URL? {
+        guard let path = defaults.string(forKey: key), !path.isEmpty else { return nil }
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue else { return nil }
+        return URL(fileURLWithPath: path, isDirectory: true)
+    }
 
     /// Create the directory if it doesn't exist.
     private func ensureDirectoryExists(at url: URL) {

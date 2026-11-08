@@ -274,12 +274,14 @@ struct ExportSettingsView: View {
         panel.nameFieldStringValue = "\(exportFileName).\(selectedFormat.fileExtension)"
         panel.canCreateDirectories = true
         panel.title = "Export Collage"
+        panel.directoryURL = AppSettings.shared.lastCollageExportDirectory
 
         panel.begin { response in
             guard response == .OK, let url = panel.url else { return }
 
             do {
                 try ExportWriter.write(image, to: url, format: selectedFormat, jpegQuality: jpegQuality, dpi: sourceDPI)
+                AppSettings.shared.lastCollageExportDirectory = url.deletingLastPathComponent()
                 Logger.debug("Export succeeded: \(url.path)")
                 dismiss()
             } catch {
